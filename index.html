@@ -376,22 +376,23 @@
     <script>
         console.log("🚀 AES O.S. ENTERPRISE: Sistema LIS cargado correctamente en memoria.");
 
-        // === INICIALIZACIÓN COMPARTIDA ===
+      // === INICIALIZACIÓN COMPARTIDA ===
         setInterval(() => { document.getElementById('reloj').innerText = new Date().toLocaleString(); }, 1000);
-       const firebaseConfig = {
-  apiKey: "AIzaSyBLuIk-gKICLWlLSdWNAsnVYPXxqvroijI",
-  authDomain: "lis-aes.firebaseapp.com",
-  databaseURL: "https://lis-aes-default-rtdb.firebaseio.com",
-  projectId: "lis-aes",
-  storageBucket: "lis-aes.firebasestorage.app",
-  messagingSenderId: "333107041449",
-  appId: "1:333107041449:web:e498022d3e04e876f9c5b8"
-};
-
-                    
+        
+        const firebaseConfig = {
+          apiKey: "AIzaSyBLuIk-gKICLWlLSdWNAsnVYPXxqvroijI",
+          authDomain: "lis-aes.firebaseapp.com",
+          databaseURL: "https://lis-aes-default-rtdb.firebaseio.com",
+          projectId: "lis-aes",
+          storageBucket: "lis-aes.firebasestorage.app",
+          messagingSenderId: "333107041449",
+          appId: "1:333107041449:web:e498022d3e04e876f9c5b8"
         };
+
+        // Inicializar Firebase usando la sintaxis de la versión 8 (Compat)
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
+        
         // === SEGURIDAD Y LOGIN ===
         const auth = firebase.auth();
 
