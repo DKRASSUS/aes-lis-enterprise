@@ -105,6 +105,8 @@
         .patient-card-val { padding: 18px 20px; border-bottom: 1px solid var(--border-color); cursor: pointer; border-left: 4px solid transparent; background: white; transition: 0.2s;}
         .patient-card-val:hover { background: #F8FAFC; padding-left: 25px; }
         .patient-card-val.active { background: #F3E8FF; border-left-color: var(--aes-purple); }
+        .btn-delete-card { background: transparent; color: #EF4444; border: none; cursor: pointer; font-size: 1.1rem; padding: 6px; border-radius: 6px; transition: 0.2s; opacity: 0.4; }
+        .btn-delete-card:hover { background: #FEE2E2; opacity: 1; }
         .status-pill { padding: 3px 8px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; }
         .status-pill.pend { background: #FEF3C7; color: #D97706; }
         .status-pill.val { background: #D1FAE5; color: #065F46; }
@@ -621,13 +623,16 @@
                     const textoPill = estaValidado ? "✔ Validado" : "Pendiente";
 
                     lista.insertAdjacentHTML('beforeend', `
-                        <div class="patient-card-val ${claseActiva}" onclick="mostrarDetalle('${key}')" id="card-${key}">
-                            <div class="patient-name">${pacienteName}</div>
-                            <div class="patient-meta">
-                                <span>Tubo: <strong>${idMuestra}</strong></span>
-                                <span class="status-pill ${clasePill}">${textoPill}</span>
-                            </div>
-                        </div>`);
+                         <div class="patient-card-val ${claseActiva}" id="card-${key}" style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                             <div style="flex: 1;" onclick="mostrarDetalle('${key}')">
+                                 <div class="patient-name">${pacienteName}</div>
+                                 <div class="patient-meta">
+                                    <span>Tubo: <strong>${idMuestra}</strong></span>
+                                    <span class="status-pill ${clasePill}">${textoPill}</span>
+                                </div>
+                         </div>
+                         <button class="btn-delete-card" onclick="borrarRegistroLIS(event, '${key}')" title="Eliminar este paciente">🗑️</button>
+                      </div>`);
                 }
             });
 
@@ -804,6 +809,24 @@
         }
 
         function rechazarMuestra() { alert("Muestra marcada para repetición."); }
+        
+        function borrarRegistroLIS(event, key) {
+            // Esto evita que al hacer clic en borrar, se abra accidentalmente la tarjeta del paciente
+            event.stopPropagation(); 
+            
+            if(confirm("⚠️ ¿Estás seguro de ELIMINAR este registro de forma permanente? Esta acción no se puede deshacer.")) {
+                db.ref("resultados/" + key).remove().then(() => {
+                    // Si el paciente que acabas de borrar lo tenías abierto en pantalla, limpia la pantalla
+                    if(pacienteSeleccionadoId === key) {
+                        document.getElementById("estado-vacio").style.display = "flex";
+                        document.getElementById("contenedor-resultados").style.display = "none";
+                        pacienteSeleccionadoId = null;
+                    }
+                }).catch(error => {
+                    alert("Hubo un error al borrar: " + error);
+                });
+            }
+        }
     </script>
 </body>
 </html>
