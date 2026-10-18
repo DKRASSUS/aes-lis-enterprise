@@ -148,6 +148,27 @@
 </head>
 <body>
 
+<!-- PANTALLA DE LOGIN -->
+    <div id="login-screen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--aes-dark); display: flex; justify-content: center; align-items: center; z-index: 9999;">
+        <div style="background: white; padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: center; width: 350px;">
+            <h1 style="margin-top: 0; color: var(--aes-dark);">AES <span style="color: var(--aes-blue);">O.S.</span></h1>
+            <p style="color: #666; font-size: 0.9rem; margin-bottom: 30px;">Acceso restringido al personal autorizado</p>
+            
+            <div style="text-align: left; margin-bottom: 15px;">
+                <label style="font-size: 0.8rem; font-weight: bold; color: #555;">Correo Electrónico</label>
+                <input type="email" id="login-email" placeholder="usuario@aes.com" style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; margin-top: 5px;">
+            </div>
+            
+            <div style="text-align: left; margin-bottom: 25px;">
+                <label style="font-size: 0.8rem; font-weight: bold; color: #555;">Contraseña</label>
+                <input type="password" id="login-pass" placeholder="••••••••" style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; margin-top: 5px;">
+            </div>
+            
+            <button onclick="iniciarSesion()" style="width: 100%; background: var(--aes-blue); color: white; border: none; padding: 15px; border-radius: 6px; font-weight: bold; font-size: 1rem; cursor: pointer;">Ingresar al Sistema</button>
+            <p id="login-error" style="color: red; font-size: 0.8rem; margin-top: 15px; display: none;">Credenciales incorrectas.</p>
+        </div>
+    </div>
+    
     <div class="topbar">
         <h2>AES <span>O.S. Enterprise</span></h2>
         <div class="clock-status">
@@ -155,6 +176,7 @@
             <div style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; background: rgba(255,255,255,0.1); padding: 5px 12px; border-radius: 20px;">
                 <span style="display: inline-block; width: 8px; height: 8px; background: var(--success); border-radius: 50%; box-shadow: 0 0 8px var(--success);"></span>
                 Sistema Online
+                <button onclick="cerrarSesion()" style="margin-left: 15px; background: transparent; border: 1px solid #EF4444; color: #EF4444; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: bold;">Salir</button>
             </div>
         </div>
     </div>
@@ -350,7 +372,7 @@
     <!-- FIREBASE SDK -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script>
         console.log("🚀 AES O.S. ENTERPRISE: Sistema LIS cargado correctamente en memoria.");
 
@@ -359,7 +381,30 @@
         const firebaseConfig = { databaseURL: "https://lis-aes-default-rtdb.firebaseio.com" };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
+        // === SEGURIDAD Y LOGIN ===
+        const auth = firebase.auth();
 
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                document.getElementById('login-screen').style.display = 'none'; // Desbloquear
+            } else {
+                document.getElementById('login-screen').style.display = 'flex'; // Bloquear
+            }
+        });
+
+        function iniciarSesion() {
+            const email = document.getElementById('login-email').value;
+            const pass = document.getElementById('login-pass').value;
+            const errorMsg = document.getElementById('login-error');
+            errorMsg.style.display = 'none';
+            
+            auth.signInWithEmailAndPassword(email, pass).catch(error => {
+                errorMsg.innerText = "Error: " + error.message;
+                errorMsg.style.display = 'block';
+            });
+        }
+
+        function cerrarSesion() { auth.signOut(); }
         // === NAVEGACIÓN SPA ===
         function switchView(viewId, element) {
             document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
