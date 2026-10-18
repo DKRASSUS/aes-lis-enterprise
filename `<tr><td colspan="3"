@@ -392,7 +392,7 @@
                 { id: "TSH", nombre: "Hormona TSH" }, { id: "FT4", nombre: "T4 Libre" }, { id: "FT3", nombre: "T3 Libre" },
                 { id: "T4", nombre: "T4 Total" }, { id: "T3", nombre: "T3 Total" }, { id: "ATPO", nombre: "Anti-TPO" },
                 { id: "ATG", nombre: "Anti-Tiroglobulina" }, { id: "TRAB", nombre: "Anti-Receptor TSH" }, { id: "FSH", nombre: "Hormona FSH" }, 
-                { id: "LH", nombre: "Hormona LH" }, { id: "PRL", nombre: "Prolactina" }, { id: "E2", Estradiol: "Estradiol" }, 
+                { id: "LH", nombre: "Hormona LH" }, { id: "PRL", nombre: "Prolactina" }, { id: "E2", nombre: "Estradiol" }, 
                 { id: "E3", nombre: "Estriol Libre" }, { id: "PRG", nombre: "Progesterona" }, { id: "TESTO", nombre: "Testosterona Total" }, 
                 { id: "TESTL", nombre: "Testosterona Libre" }, { id: "SHBG", nombre: "Globulina Fijadora Sex." }, { id: "BHCG", nombre: "Beta-hCG Cuantitativa" }, 
                 { id: "AMH", nombre: "Hormona Antimülleriana" }, { id: "CORT", nombre: "Cortisol (Sérico)" }, { id: "ACTH", nombre: "Hormona ACTH" }, 
@@ -612,4 +612,251 @@
             
             keys.forEach(key => {
                 const registro = datosGlobales[key];
-                const estaValidado =
+                const estaValidado = (registro.estado === "Validado_Final");
+
+                if ((filtroActual === "Pendientes" && !estaValidado) || (filtroActual === "Validados" && estaValidado)) {
+                    keysMostradas++;
+                    const pacienteName = registro.paciente || "Paciente Desconocido";
+                    const idMuestra = registro.muestra || "N/A";
+                    const claseActiva = (pacienteSeleccionadoId === key) ? "active" : "";
+                    const clasePill = estaValidado ? "val" : "pend";
+                    const textoPill = estaValidado ? "✔ Validado" : "Pendiente";
+
+                    lista.insertAdjacentHTML('beforeend', `
+                         <div class="patient-card-val ${claseActiva}" id="card-${key}" style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                             <div style="flex: 1;" onclick="mostrarDetalle('${key}')">
+                                 <div class="patient-name">${pacienteName}</div>
+                                 <div class="patient-meta">
+                                    <span>Tubo: <strong>${idMuestra}</strong></span>
+                                    <span class="status-pill ${clasePill}">${textoPill}</span>
+                                </div>
+                         </div>
+                         <button class="btn-delete-card" onclick="borrarRegistroLIS(event, '${key}')" title="Eliminar este paciente">🗑️</button>
+                      </div>`);
+                }
+            });
+
+            if (keysMostradas === 0) {
+                const mensaje = filtroActual === "Pendientes" ? "No hay muestras pendientes." : "No hay informes en el archivo histórico.";
+                lista.innerHTML = `<div style="padding: 30px; text-align: center; color: #888;">${mensaje}</div>`;
+            }
+        }
+
+        function mostrarDetalle(key) {
+            pacienteSeleccionadoId = key;
+            const registro = datosGlobales[key];
+            const estaValidado = (registro.estado === "Validado_Final");
+            
+            document.querySelectorAll('.patient-card-val').forEach(el => el.classList.remove('active'));
+            document.getElementById(`card-${key}`).classList.add('active');
+            document.getElementById("estado-vacio").style.display = "none";
+            document.getElementById("contenedor-resultados").style.display = "block";
+
+            if(estaValidado) {
+                document.getElementById('botones-pendientes').style.display = "none";
+                document.getElementById('botones-validados').style.display = "flex";
+                document.getElementById('badge-estado-visor').innerText = "✔ ARCHIVADO (SOLO LECTURA)";
+                document.getElementById('badge-estado-visor').style.color = "var(--success)";
+            } else {
+                document.getElementById('botones-pendientes').style.display = "flex";
+                document.getElementById('botones-validados').style.display = "none";
+                document.getElementById('badge-estado-visor').innerText = "Pendiente Firma";
+                document.getElementById('badge-estado-visor').style.color = "var(--aes-blue)";
+            }
+
+            document.getElementById("detalle-nombre").innerText = registro.paciente || "N/A";
+            document.getElementById("detalle-muestra").innerText = registro.muestra || "N/A";
+            document.getElementById("detalle-equipo").innerText = registro.equipo || "Analizador LIS";
+
+            document.getElementById("pdf-paciente").innerText = registro.paciente || "N/A";
+            document.getElementById("pdf-orden").innerText = registro.muestra || "N/A";
+            document.getElementById("pdf-equipo").innerText = registro.equipo || "N/A";
+            document.getElementById("pdf-fecha").innerText = registro.fecha_validacion ? new Date(registro.fecha_validacion).toLocaleString() : new Date().toLocaleString();
+
+            const tablaLIS = document.getElementById("tabla-analitos");
+            const contPDF = document.getElementById("pdf-resultados-dinamicos");
+            tablaLIS.innerHTML = "";
+            contPDF.innerHTML = "";
+
+            const resultadosBrutos = registro.resultados_totales || registro.resultados || registro.resultaos || "";
+
+            if(resultadosBrutos !== "") {
+                const lineasAnalitos = resultadosBrutos.split('~');
+                let resultadosAgrupados = {};
+                
+                // 1. LEER Y AGRUPAR LOS DATOS (Sin dibujar la pantalla todavía)
+                lineasAnalitos.forEach(linea => {
+                    if(linea.trim() === "") return; 
+                    const partes = linea.split(':');
+                    const nombrePrueba = partes[0].trim();
+                    let valorUnidad = partes.slice(1).join(':').trim(); 
+                    
+                    let valorNum = valorUnidad;
+                    let unidadStr = "";
+                    const sep = valorUnidad.indexOf(' ');
+                    if(sep > -1) {
+                        valorNum = valorUnidad.substring(0, sep).trim();
+                        unidadStr = valorUnidad.substring(sep).trim();
+                    }
+
+                    const infoPrueba = obtenerInfoPrueba(nombrePrueba);
+                    if(!resultadosAgrupados[infoPrueba.cat]) {
+                        resultadosAgrupados[infoPrueba.cat] = [];
+                    }
+                    resultadosAgrupados[infoPrueba.cat].push({
+                        nombre: nombrePrueba,
+                        valor: valorNum,
+                        unidad: unidadStr,
+                        ref: infoPrueba.ref
+                    });
+                });
+
+                // 2. DIBUJAR PANTALLA WEB Y PDF YA ESTRUCTURADOS Y AGRUPADOS
+                Object.keys(resultadosAgrupados).forEach(categoria => {
+                    
+                    // --- DIBUJAR BANDA DE CATEGORÍA EN LA WEB ---
+                    tablaLIS.insertAdjacentHTML('beforeend', `
+                        <tr style="background: #F3E8FF;">
+                            <td colspan="3" style="padding: 10px 20px; font-weight: 800; color: var(--aes-purple); font-size: 0.85rem; text-transform: uppercase; border-bottom: 2px solid var(--aes-purple);">
+                                🏷️ ${categoria}
+                            </td>
+                        </tr>
+                    `);
+
+                    // --- INICIAR BANDA DE CATEGORÍA EN PDF ---
+                    let htmlSeccion = `
+                        <div class="pdf-banda-color">${categoria}</div>
+                        <table class="pdf-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 30%;">EXAMEN</th>
+                                    <th style="width: 20%;">RESULTADO</th>
+                                    <th style="width: 20%;">UNIDAD</th>
+                                    <th style="width: 30%;">RANGO DE REFERENCIA</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                    `;
+
+                    // --- LLENAR LAS FILAS DE PRUEBAS DE ESTA CATEGORÍA ---
+                    resultadosAgrupados[categoria].forEach(res => {
+                        // Dibujar Fila WEB (Le damos un pequeño margen para que se note que pertenece al grupo)
+                        tablaLIS.insertAdjacentHTML('beforeend', `
+                            <tr>
+                                <td class="test-name" style="padding-left: 35px;"><span class="test-icon"></span> ${res.nombre}</td>
+                                <td class="test-value">${res.valor}</td>
+                                <td><span class="unit-badge">${res.unidad || '-'}</span></td>
+                            </tr>
+                        `);
+
+                        // Dibujar Fila PDF
+                        htmlSeccion += `
+                            <tr>
+                                <td style="font-weight: bold;">${res.nombre}</td>
+                                <td style="font-family: monospace; font-size: 13px; font-weight: bold;">${res.valor}</td>
+                                <td style="color: #666;">${res.unidad || '-'}</td>
+                                <td style="color: #888; font-size: 11px;">${res.ref}</td>
+                            </tr>
+                        `;
+                    });
+
+                    // --- CERRAR SECCIÓN PDF ---
+                    htmlSeccion += `</tbody></table>`;
+                    contPDF.insertAdjacentHTML('beforeend', htmlSeccion);
+                });
+
+           
+            } else {
+                tablaLIS.innerHTML = `<tr><td colspan="3" style="text-align: center; padding: 20px;">Sin resultados</td></tr>`;
+                contPDF.innerHTML = `<p>No hay resultados analíticos disponibles para imprimir.</p>`;
+            }
+        }
+
+        function descargarSoloPDF(forzarValidacion = false) {
+            const btn = document.querySelector(forzarValidacion ? '.btn-validate-pdf' : '.btn-reprint');
+            const textoOriginal = btn.innerHTML;
+            btn.innerHTML = "⏳ Generando Informe...";
+
+            const pdfWrapper = document.getElementById('pdf-container');
+            const elementoPlantilla = document.getElementById('plantilla-pdf');
+            
+            pdfWrapper.style.display = 'block';
+            pdfWrapper.style.position = 'absolute';
+            pdfWrapper.style.zIndex = '-100';
+
+            const nombreArchivo = `Informe_AES_${document.getElementById('pdf-paciente').innerText.replace(/\s+/g, '_')}.pdf`;
+            const opt = {
+                margin:       10,
+                filename:     nombreArchivo,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2 },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            html2pdf().set(opt).from(elementoPlantilla).save().then(() => {
+                pdfWrapper.style.display = 'none';
+                btn.innerHTML = textoOriginal;
+
+                if(forzarValidacion) {
+                    db.ref("resultados/" + pacienteSeleccionadoId).update({
+                        estado: "Validado_Final",
+                        fecha_validacion: new Date().toISOString()
+                    }).then(() => {
+                        alert(`¡Éxito! Informe estructurado descargado. Muestra archivada en Validados.`);
+                    });
+                }
+            });
+        }
+
+        function validarYGenerarPDF() {
+            if(!pacienteSeleccionadoId) return;
+            if(confirm("¿Confirma la liberación médica de este informe?")) {
+                descargarSoloPDF(true);
+            }
+        }
+
+        function revertirValidacion() {
+            if(!pacienteSeleccionadoId) return;
+            if(confirm("¿Regresar informe a la bandeja de Pendientes?")) {
+                db.ref("resultados/" + pacienteSeleccionadoId).update({ estado: "Pendiente Validacion" }).then(() => {
+                    document.getElementById("estado-vacio").style.display = "flex";
+                    document.getElementById("contenedor-resultados").style.display = "none";
+                    pacienteSeleccionadoId = null;
+                });
+            }
+        }
+
+        function rechazarMuestra() { 
+            if(!pacienteSeleccionadoId) return;
+            if(confirm("⚠️ ¿Estás seguro de RECHAZAR y ELIMINAR esta muestra? Desaparecerá de la lista para siempre.")) {
+                db.ref("resultados/" + pacienteSeleccionadoId).remove().then(() => {
+                    // Ocultamos el panel de revisión porque el paciente ya no existe
+                    document.getElementById("estado-vacio").style.display = "flex";
+                    document.getElementById("contenedor-resultados").style.display = "none";
+                    pacienteSeleccionadoId = null;
+                }).catch(error => {
+                    alert("Hubo un error al intentar eliminar: " + error);
+                });
+            }
+        }
+        
+        function borrarRegistroLIS(event, key) {
+            // Esto evita que al hacer clic en borrar, se abra accidentalmente la tarjeta del paciente
+            event.stopPropagation(); 
+            
+            if(confirm("⚠️ ¿Estás seguro de ELIMINAR este registro de forma permanente? Esta acción no se puede deshacer.")) {
+                db.ref("resultados/" + key).remove().then(() => {
+                    // Si el paciente que acabas de borrar lo tenías abierto en pantalla, limpia la pantalla
+                    if(pacienteSeleccionadoId === key) {
+                        document.getElementById("estado-vacio").style.display = "flex";
+                        document.getElementById("contenedor-resultados").style.display = "none";
+                        pacienteSeleccionadoId = null;
+                    }
+                }).catch(error => {
+                    alert("Hubo un error al borrar: " + error);
+                });
+            }
+        }
+    </script>
+</body>
+</html>
