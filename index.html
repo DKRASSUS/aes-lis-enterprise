@@ -808,7 +808,19 @@
             }
         }
 
-        function rechazarMuestra() { alert("Muestra marcada para repetición."); }
+        function rechazarMuestra() { 
+            if(!pacienteSeleccionadoId) return;
+            if(confirm("⚠️ ¿Estás seguro de RECHAZAR y ELIMINAR esta muestra? Desaparecerá de la lista para siempre.")) {
+                db.ref("resultados/" + pacienteSeleccionadoId).remove().then(() => {
+                    // Ocultamos el panel de revisión porque el paciente ya no existe
+                    document.getElementById("estado-vacio").style.display = "flex";
+                    document.getElementById("contenedor-resultados").style.display = "none";
+                    pacienteSeleccionadoId = null;
+                }).catch(error => {
+                    alert("Hubo un error al intentar eliminar: " + error);
+                });
+            }
+        }
         
         function borrarRegistroLIS(event, key) {
             // Esto evita que al hacer clic en borrar, se abra accidentalmente la tarjeta del paciente
