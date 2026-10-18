@@ -378,7 +378,15 @@
 
         // === INICIALIZACIÓN COMPARTIDA ===
         setInterval(() => { document.getElementById('reloj').innerText = new Date().toLocaleString(); }, 1000);
-        const firebaseConfig = { databaseURL: "https://lis-aes-default-rtdb.firebaseio.com" };
+        const firebaseConfig = {
+  apiKey: "AIzaSy...",
+  authDomain: "lis-aes.firebaseapp.com",
+  databaseURL: "https://lis-aes-default-rtdb.firebaseio.com",
+  projectId: "lis-aes",
+  storageBucket: "lis-aes.firebasestorage.app",
+  messagingSenderId: "333107041449",
+  appId: "1:333107041449..."
+};
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
         // === SEGURIDAD Y LOGIN ===
