@@ -684,6 +684,7 @@
                 const lineasAnalitos = resultadosBrutos.split('~');
                 let resultadosAgrupados = {};
                 
+                // 1. LEER Y AGRUPAR LOS DATOS (Sin dibujar la pantalla todavía)
                 lineasAnalitos.forEach(linea => {
                     if(linea.trim() === "") return; 
                     const partes = linea.split(':');
@@ -698,14 +699,6 @@
                         unidadStr = valorUnidad.substring(sep).trim();
                     }
 
-                    tablaLIS.insertAdjacentHTML('beforeend', `
-                        <tr>
-                            <td class="test-name"><span class="test-icon"></span> ${nombrePrueba}</td>
-                            <td class="test-value">${valorNum}</td>
-                            <td><span class="unit-badge">${unidadStr || '-'}</span></td>
-                        </tr>
-                    `);
-
                     const infoPrueba = obtenerInfoPrueba(nombrePrueba);
                     if(!resultadosAgrupados[infoPrueba.cat]) {
                         resultadosAgrupados[infoPrueba.cat] = [];
@@ -718,7 +711,19 @@
                     });
                 });
 
+                // 2. DIBUJAR PANTALLA WEB Y PDF YA ESTRUCTURADOS Y AGRUPADOS
                 Object.keys(resultadosAgrupados).forEach(categoria => {
+                    
+                    // --- DIBUJAR BANDA DE CATEGORÍA EN LA WEB ---
+                    tablaLIS.insertAdjacentHTML('beforeend', `
+                        <tr style="background: #F3E8FF;">
+                            <td colspan="3" style="padding: 10px 20px; font-weight: 800; color: var(--aes-purple); font-size: 0.85rem; text-transform: uppercase; border-bottom: 2px solid var(--aes-purple);">
+                                🏷️ ${categoria}
+                            </td>
+                        </tr>
+                    `);
+
+                    // --- INICIAR BANDA DE CATEGORÍA EN PDF ---
                     let htmlSeccion = `
                         <div class="pdf-banda-color">${categoria}</div>
                         <table class="pdf-table">
@@ -733,7 +738,18 @@
                             <tbody>
                     `;
 
+                    // --- LLENAR LAS FILAS DE PRUEBAS DE ESTA CATEGORÍA ---
                     resultadosAgrupados[categoria].forEach(res => {
+                        // Dibujar Fila WEB (Le damos un pequeño margen para que se note que pertenece al grupo)
+                        tablaLIS.insertAdjacentHTML('beforeend', `
+                            <tr>
+                                <td class="test-name" style="padding-left: 35px;"><span class="test-icon"></span> ${res.nombre}</td>
+                                <td class="test-value">${res.valor}</td>
+                                <td><span class="unit-badge">${res.unidad || '-'}</span></td>
+                            </tr>
+                        `);
+
+                        // Dibujar Fila PDF
                         htmlSeccion += `
                             <tr>
                                 <td style="font-weight: bold;">${res.nombre}</td>
@@ -744,9 +760,12 @@
                         `;
                     });
 
+                    // --- CERRAR SECCIÓN PDF ---
                     htmlSeccion += `</tbody></table>`;
                     contPDF.insertAdjacentHTML('beforeend', htmlSeccion);
                 });
+
+            } else {
 
             } else {
                 tablaLIS.innerHTML = `<tr><td colspan="3" style="text-align: center; padding: 20px;">Sin resultados</td></tr>`;
