@@ -27,6 +27,18 @@
     <div class="topbar">
         <h2>AES <span>O.S. Enterprise</span></h2>
         <div class="clock-status">
+            
+            <!-- NUEVO: CAMPANA DE NOTIFICACIONES -->
+            <div class="notification-center" onclick="toggleNotificaciones()">
+                <div class="bell-icon">🔔<span class="badge-count" id="campana-badge">0</span></div>
+                <div class="notif-dropdown" id="notif-dropdown">
+                    <div class="notif-header"><span>Notificaciones</span> <span style="cursor:pointer; color:var(--aes-blue); font-size:0.8rem;" onclick="marcarTodasLeidas(event)">Marcar leídas</span></div>
+                    <div class="notif-body" id="notif-lista">
+                        <div style="padding: 20px; text-align: center; color: #888; font-size: 0.85rem;">No hay notificaciones nuevas</div>
+                    </div>
+                </div>
+            </div>
+
             <span id="reloj" style="font-weight: 600; color: #C2E778; font-size: 0.9rem;"></span>
             <div style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; background: rgba(255,255,255,0.1); padding: 5px 12px; border-radius: 20px;">
                 <span style="display: inline-block; width: 8px; height: 8px; background: var(--success); border-radius: 50%;"></span> Sistema Online
