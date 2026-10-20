@@ -27,18 +27,13 @@
     <div class="topbar">
         <h2>AES <span>O.S. Enterprise</span></h2>
         <div class="clock-status">
-            
-            <!-- NUEVO: CAMPANA DE NOTIFICACIONES -->
             <div class="notification-center" onclick="toggleNotificaciones()">
                 <div class="bell-icon">🔔<span class="badge-count" id="campana-badge">0</span></div>
                 <div class="notif-dropdown" id="notif-dropdown">
                     <div class="notif-header"><span>Notificaciones</span> <span style="cursor:pointer; color:var(--aes-blue); font-size:0.8rem;" onclick="marcarTodasLeidas(event)">Marcar leídas</span></div>
-                    <div class="notif-body" id="notif-lista">
-                        <div style="padding: 20px; text-align: center; color: #888; font-size: 0.85rem;">No hay notificaciones nuevas</div>
-                    </div>
+                    <div class="notif-body" id="notif-lista"><div style="padding: 20px; text-align: center; color: #888; font-size: 0.85rem;">No hay notificaciones</div></div>
                 </div>
             </div>
-
             <span id="reloj" style="font-weight: 600; color: #C2E778; font-size: 0.9rem;"></span>
             <div style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; background: rgba(255,255,255,0.1); padding: 5px 12px; border-radius: 20px;">
                 <span style="display: inline-block; width: 8px; height: 8px; background: var(--success); border-radius: 50%;"></span> Sistema Online
@@ -51,6 +46,7 @@
         <nav class="side-nav">
             <div class="nav-item active" onclick="switchView('admision', this)">🏥 Admisión y Órdenes</div>
             <div class="nav-item" onclick="switchView('validacion', this)">🔬 Validación Médica</div>
+            <div class="nav-item" onclick="switchView('estadisticas', this)">📊 Estadísticas</div>
             <div class="nav-item" onclick="switchView('configuracion', this)" style="margin-top: 20px; border-top: 1px solid var(--border-color);">⚙️ Configuración</div>
         </nav>
 
@@ -112,37 +108,50 @@
                 </div>
             </div>
 
-            <!-- VISTA 3: CONFIGURACIÓN AUTÓNOMA -->
-            <div id="view-configuracion" class="view-section">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                    <!-- Panel de Seguros -->
-                    <div class="panel panel-blue">
-                        <h3 class="panel-title">🛡️ Gestión de Seguros y Descuentos</h3>
-                        <div class="form-row">
-                            <div class="form-group"><label>Nombre Institución/Seguro</label><input type="text" id="conf-seguro-nombre" placeholder="Ej: Seguro BISA"></div>
-                            <div class="form-group"><label>% Descuento (0 a 100)</label><input type="number" id="conf-seguro-desc" placeholder="Ej: 20"></div>
-                        </div>
-                        <button class="btn-success-adm" style="margin-top:0; padding: 10px;" onclick="guardarSeguro()">Guardar Seguro</button>
-                        
-                        <table class="history-table" style="margin-top: 20px;">
-                            <thead><tr><th>Seguro</th><th>Descuento</th><th>Acción</th></tr></thead>
-                            <tbody id="tabla-conf-seguros"></tbody>
-                        </table>
+            <!-- VISTA 3: ESTADÍSTICAS (NUEVA FASE) -->
+            <div id="view-estadisticas" class="view-section">
+                <div class="panel panel-blue">
+                    <h3 class="panel-title">📊 Rendimiento del Laboratorio y Equipos</h3>
+                    
+                    <div style="display: flex; gap: 15px; margin-bottom: 20px; background: #F8FAFC; padding: 15px; border-radius: 8px; border: 1px solid var(--border-color);">
+                        <div style="flex: 1;"><label style="font-weight:bold; font-size:0.8rem; color:#555;">Fecha Inicio</label><input type="date" id="filtro-fecha-inicio" style="width:100%; padding:10px;"></div>
+                        <div style="flex: 1;"><label style="font-weight:bold; font-size:0.8rem; color:#555;">Fecha Fin</label><input type="date" id="filtro-fecha-fin" style="width:100%; padding:10px;"></div>
+                        <div style="display: flex; align-items: flex-end;"><button class="btn-search" onclick="calcularEstadisticas()">Aplicar Filtro</button></div>
                     </div>
 
-                    <!-- Panel de Pruebas -->
-                    <div class="panel panel-blue">
-                        <h3 class="panel-title">🧪 Catálogo de Pruebas y Precios Base</h3>
-                        <div class="form-row">
-                            <div class="form-group"><label>Abreviación (Ej: GLU)</label><input type="text" id="conf-prueba-id"></div>
-                            <div class="form-group"><label>Precio Base (Bs)</label><input type="number" id="conf-prueba-precio"></div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                        <div style="background: var(--aes-blue); color: white; padding: 25px; border-radius: 8px; text-align: center; box-shadow: 0 4px 10px rgba(0,168,232,0.3);">
+                            <div style="font-size: 3rem; font-weight: 800;" id="stat-total-tubos">0</div>
+                            <div style="font-size: 0.9rem; font-weight: bold; text-transform: uppercase;">Tubos Procesados</div>
                         </div>
-                        <button class="btn-success-adm" style="margin-top:0; padding: 10px;" onclick="guardarPrueba()">Guardar Prueba / Actualizar Precio</button>
-                        
-                        <table class="history-table" style="margin-top: 20px;">
-                            <thead><tr><th>Prueba (ID)</th><th>Precio Base</th><th>Acción</th></tr></thead>
-                            <tbody id="tabla-conf-pruebas"></tbody>
-                        </table>
+                        <div style="background: var(--aes-purple); color: white; padding: 25px; border-radius: 8px; text-align: center; box-shadow: 0 4px 10px rgba(107,33,168,0.3);">
+                            <div style="font-size: 3rem; font-weight: 800;" id="stat-top-prueba">---</div>
+                            <div style="font-size: 0.9rem; font-weight: bold; text-transform: uppercase;">Prueba Más Solicitada</div>
+                        </div>
+                    </div>
+
+                    <h4 style="color: var(--aes-dark); border-bottom: 2px solid var(--border-color); padding-bottom: 10px;">Desglose por Prueba (Consumo de Reactivos)</h4>
+                    <table class="history-table">
+                        <thead><tr><th>Parámetro (ID)</th><th>Cantidad Procesada</th></tr></thead>
+                        <tbody id="tabla-estadisticas"><tr><td colspan="2" style="text-align: center; padding: 20px; color: #888;">Aplique un filtro para ver datos.</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- VISTA 4: CONFIGURACIÓN -->
+            <div id="view-configuracion" class="view-section">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="panel panel-blue">
+                        <h3 class="panel-title">🛡️ Gestión de Seguros y Descuentos</h3>
+                        <div class="form-row"><div class="form-group"><label>Nombre Institución/Seguro</label><input type="text" id="conf-seguro-nombre"></div><div class="form-group"><label>% Descuento</label><input type="number" id="conf-seguro-desc"></div></div>
+                        <button class="btn-success-adm" style="margin-top:0; padding: 10px;" onclick="guardarSeguro()">Guardar Seguro</button>
+                        <table class="history-table" style="margin-top: 20px;"><thead><tr><th>Seguro</th><th>Descuento</th><th>Acción</th></tr></thead><tbody id="tabla-conf-seguros"></tbody></table>
+                    </div>
+                    <div class="panel panel-blue">
+                        <h3 class="panel-title">🧪 Catálogo y Precios Base</h3>
+                        <div class="form-row"><div class="form-group"><label>Abreviación (Ej: GLU)</label><input type="text" id="conf-prueba-id"></div><div class="form-group"><label>Precio Base (Bs)</label><input type="number" id="conf-prueba-precio"></div></div>
+                        <button class="btn-success-adm" style="margin-top:0; padding: 10px;" onclick="guardarPrueba()">Actualizar Precio</button>
+                        <table class="history-table" style="margin-top: 20px;"><thead><tr><th>Prueba (ID)</th><th>Precio Base</th><th>Acción</th></tr></thead><tbody id="tabla-conf-pruebas"></tbody></table>
                     </div>
                 </div>
             </div>
@@ -150,7 +159,6 @@
         </main>
     </div>
 
-    <!-- Modales y PDF -->
     <div class="modal-overlay" id="modal-pruebas"><div class="modal-content"><div class="modal-header"><h3 id="modal-titulo">Pruebas</h3><button class="btn-close" onclick="cerrarModal()">×</button></div><div class="modal-body"><div class="test-grid" id="modal-grid"></div></div><div class="modal-footer"><button class="btn-save-modal" onclick="cerrarModal()">Confirmar</button></div></div></div>
     
     <div id="pdf-container">
