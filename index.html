@@ -108,7 +108,7 @@
                 </div>
             </div>
 
-            <!-- VISTA 3: ESTADÍSTICAS (NUEVA FASE) -->
+            <!-- VISTA 3: ESTADÍSTICAS -->
             <div id="view-estadisticas" class="view-section">
                 <div class="panel panel-blue">
                     <h3 class="panel-title">📊 Rendimiento del Laboratorio y Equipos</h3>
@@ -130,9 +130,13 @@
                         </div>
                     </div>
 
-                    <h4 style="color: var(--aes-dark); border-bottom: 2px solid var(--border-color); padding-bottom: 10px;">Desglose por Prueba (Consumo de Reactivos)</h4>
+                    <h4 style="color: var(--aes-dark); border-bottom: 2px solid var(--border-color); padding-bottom: 10px; margin-bottom: 15px;">Desglose por Prueba</h4>
+                    
+                    <!-- NUEVO: BUSCADOR DE PARÁMETROS -->
+                    <input type="text" id="buscador-parametros" class="stat-search-box" placeholder="🔍 Buscar parámetro específico (Ej: GLU, CREA...)" onkeyup="filtrarTablaParametros()">
+                    
                     <table class="history-table">
-                        <thead><tr><th>Parámetro (ID)</th><th>Cantidad Procesada</th></tr></thead>
+                        <thead><tr><th>Parámetro (ID)</th><th>Cantidad Procesada (Click para ver desglose)</th></tr></thead>
                         <tbody id="tabla-estadisticas"><tr><td colspan="2" style="text-align: center; padding: 20px; color: #888;">Aplique un filtro para ver datos.</td></tr></tbody>
                     </table>
                 </div>
@@ -159,8 +163,50 @@
         </main>
     </div>
 
+    <!-- Modal Pruebas Admisión -->
     <div class="modal-overlay" id="modal-pruebas"><div class="modal-content"><div class="modal-header"><h3 id="modal-titulo">Pruebas</h3><button class="btn-close" onclick="cerrarModal()">×</button></div><div class="modal-body"><div class="test-grid" id="modal-grid"></div></div><div class="modal-footer"><button class="btn-save-modal" onclick="cerrarModal()">Confirmar</button></div></div></div>
     
+    <!-- NUEVO: MODAL DE PROFUNDIZACIÓN (DRILL-DOWN) -->
+    <div class="modal-overlay" id="modal-detalle-prueba">
+        <div class="modal-content" style="max-width: 1000px; max-height: 90vh;">
+            <div class="modal-header">
+                <h3 id="modal-detalle-titulo">Detalle de Pacientes - PRUEBA</h3>
+                <button class="btn-close" onclick="cerrarModalDetalle()">×</button>
+            </div>
+            <div class="modal-body" style="padding: 20px 30px;">
+                <!-- Filtros del Modal -->
+                <div class="form-row" style="margin-bottom: 20px; background: #F8FAFC; padding: 15px; border-radius: 6px; border: 1px solid var(--border-color);">
+                    <div class="form-group" style="margin-bottom: 0;"><label>Buscar Paciente / Tubo</label><input type="text" id="filtro-modal-paciente" placeholder="🔍 Escribe nombre o número..." onkeyup="aplicarFiltrosModal()"></div>
+                    <div class="form-group" style="margin-bottom: 0;"><label>Fecha Exacta (Opcional)</label><input type="date" id="filtro-modal-fecha" onchange="aplicarFiltrosModal()"></div>
+                </div>
+                
+                <!-- Tabla del Modal -->
+                <table class="history-table">
+                    <thead><tr><th>Fecha / Hora</th><th>Tubo ID</th><th>Nombre del Paciente</th><th>Valor Obtenido</th><th>Estado</th></tr></thead>
+                    <tbody id="tabla-modal-detalle"></tbody>
+                </table>
+            </div>
+            <!-- Paginación -->
+            <div class="pagination-controls">
+                <div>
+                    <label style="font-size: 0.8rem; font-weight: bold; margin-right: 10px; color: #555;">Mostrar:</label>
+                    <select id="select-paginacion" class="select-page" onchange="cambiarItemsPorPagina()">
+                        <option value="10">10</option>
+                        <option value="30" selected>30</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+                </div>
+                <div style="display: flex; align-items: center;">
+                    <button class="page-btn" id="btn-prev-page" onclick="cambiarPagina(-1)">Anterior</button>
+                    <span id="lbl-pagina-actual" style="font-size: 0.85rem; font-weight: bold; margin: 0 15px; color: var(--aes-dark);">Pág 1 de 1</span>
+                    <button class="page-btn" id="btn-next-page" onclick="cambiarPagina(1)">Siguiente</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PLANTILLA PDF -->
     <div id="pdf-container">
         <div id="plantilla-pdf">
             <div class="pdf-header">
