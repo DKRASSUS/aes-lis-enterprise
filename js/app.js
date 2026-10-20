@@ -82,7 +82,7 @@ function actualizarSelectSeguros() {
 let pruebasSeleccionadas = new Set(); let preciosModificados = {}; 
 const catalogoPruebas = {
     quimica: [ { id: "GLU", nombre: "Glucosa" }, { id: "UREA", nombre: "Urea" }, { id: "BUN", nombre: "Nitrógeno Ureico" }, { id: "CREA", nombre: "Creatinina" }, { id: "URI", nombre: "Ácido Úrico" }, { id: "COL", nombre: "Colesterol Total" }, { id: "TRIG", nombre: "Triglicéridos" }, { id: "HDL", nombre: "Colesterol HDL" }, { id: "LDL", nombre: "Colesterol LDL" }, { id: "VLDL", nombre: "Colesterol VLDL" }, { id: "LIPA", nombre: "Lipoproteína (a)" }, { id: "APOA1", nombre: "Apolipoproteína A1" }, { id: "APOB", nombre: "Apolipoproteína B" }, { id: "AST", nombre: "AST / GOT" }, { id: "ALT", nombre: "ALT / GPT" }, { id: "ALP", nombre: "Fosfatasa Alcalina" }, { id: "GGT", nombre: "Gamma GT" }, { id: "LDH", nombre: "Lactato Deshidrogenasa" }, { id: "BT", nombre: "Bilirrubina Total" }, { id: "BD", nombre: "Bilirrubina Directa" }, { id: "BI", nombre: "Bilirrubina Indirecta" }, { id: "PT", nombre: "Proteínas Totales" }, { id: "ALB", nombre: "Albúmina" }, { id: "GLOB", nombre: "Globulinas" }, { id: "CA", nombre: "Calcio Total" }, { id: "CAI", nombre: "Calcio Iónico" }, { id: "P", nombre: "Fósforo" }, { id: "MG", nombre: "Magnesio" }, { id: "FE", nombre: "Hierro Sanguíneo" }, { id: "TIBC", nombre: "Capacidad Fijación Fe" }, { id: "NA", nombre: "Sodio (Na+)" }, { id: "K", nombre: "Potasio (K+)" }, { id: "CL", nombre: "Cloro (Cl-)" }, { id: "AMIL", nombre: "Amilasa" }, { id: "LIP", nombre: "Lipasa" }, { id: "HBA1C", nombre: "Hemoglobina A1c" }, { id: "PCR", nombre: "Proteína C Reactiva" }, { id: "ASO", nombre: "Antiestreptolisina O" }, { id: "FR", nombre: "Factor Reumatoide" }, { id: "C3", nombre: "Complemento C3" }, { id: "C4", nombre: "Complemento C4" }, { id: "IGA", nombre: "Inmunoglobulina A" }, { id: "IGG", nombre: "Inmunoglobulina G" }, { id: "IGM", nombre: "Inmunoglobulina M" }, { id: "DIG", nombre: "Digoxina" }, { id: "VAL", nombre: "Ácido Valproico" }, { id: "FEN", nombre: "Fenitoína" }, { id: "CBZ", nombre: "Carbamazepina" } ],
-    inmunologia: [ { id: "TSH", nombre: "Hormona TSH" }, { id: "FT4", nombre: "T4 Libre" }, { id: "FT3", nombre: "T3 Libre" }, { id: "T4", nombre: "T4 Total" }, { id: "T3", nombre: "T3 Total" }, { id: "ATPO", nombre: "Anti-TPO" }, { id: "ATG", nombre: "Anti-Tiroglobulina" }, { id: "TRAB", nombre: "Anti-Receptor TSH" }, { id: "FSH", nombre: "Hormona FSH" }, { id: "LH", nombre: "Hormona LH" }, { id: "PRL", nombre: "Prolactina" }, { id: "E2", nombre: "Estradiol" }, { id: "E3", nombre: "Estriol Libre" }, { id: "PRG", nombre: "Progesterona" }, { id: "TESTO", nombre: "Testosterona Total" }, { id: "TESTL", nombre: "Testosterona Libre" }, { id: "SHBG", nombre: "Globulina Fijadora Sex." }, { id: "BHCG", nombre: "Beta-hCG Cuantitativa" }, { id: "AMH", nombre: "Hormona Antimülleriana" }, { id: "CORT", nombre: "Cortisol (Sérico)" }, { id: "ACTH", nombre: "Hormona ACTH" }, { id: "PTH", nombre: "Paratohormona Intacta" }, { id: "INS", nombre: "Insulina" }, { id: "CPEP", nombre: "Péptido C" }, { id: "FERR", nombre: "Ferritina" }, { id: "VITD", nombre: "Vitamina D (25-OH)" }, { id: "VITB12", nombre: "Vitamina B12" }, { id: "FOL", nombre: "Ácido Fólico" }, { id: "TROP", nombre: "Troponina I Alta Sens." }, { id: "PROBNP", nombre: "NT-proBNP" }, { id: "CKMB", nombre: "CK-MB Masa" }, { id: "MYO", nombre: "Mioglobina" }, { id: "PCT", nombre: "Procalcitonina" }, { id: "IGE", nombre: "IgE Total" }, { id: "ANA", nombre: "Anticuerpos ANA" }, { id: "ADN", nombre: "Anti-DNA dc" } ],
+    inmunologia: [ { id: "TSH", prenombre: "Hormona TSH" }, { id: "FT4", nombre: "T4 Libre" }, { id: "FT3", nombre: "T3 Libre" }, { id: "T4", nombre: "T4 Total" }, { id: "T3", nombre: "T3 Total" }, { id: "ATPO", nombre: "Anti-TPO" }, { id: "ATG", nombre: "Anti-Tiroglobulina" }, { id: "TRAB", nombre: "Anti-Receptor TSH" }, { id: "FSH", nombre: "Hormona FSH" }, { id: "LH", nombre: "Hormona LH" }, { id: "PRL", nombre: "Prolactina" }, { id: "E2", nombre: "Estradiol" }, { id: "E3", nombre: "Estriol Libre" }, { id: "PRG", nombre: "Progesterona" }, { id: "TESTO", nombre: "Testosterona Total" }, { id: "TESTL", nombre: "Testosterona Libre" }, { id: "SHBG", nombre: "Globulina Fijadora Sex." }, { id: "BHCG", nombre: "Beta-hCG Cuantitativa" }, { id: "AMH", nombre: "Hormona Antimülleriana" }, { id: "CORT", nombre: "Cortisol (Sérico)" }, { id: "ACTH", nombre: "Hormona ACTH" }, { id: "PTH", nombre: "Paratohormona Intacta" }, { id: "INS", nombre: "Insulina" }, { id: "CPEP", nombre: "Péptido C" }, { id: "FERR", nombre: "Ferritina" }, { id: "VITD", nombre: "Vitamina D (25-OH)" }, { id: "VITB12", nombre: "Vitamina B12" }, { id: "FOL", nombre: "Ácido Fólico" }, { id: "TROP", nombre: "Troponina I Alta Sens." }, { id: "PROBNP", nombre: "NT-proBNP" }, { id: "CKMB", nombre: "CK-MB Masa" }, { id: "MYO", nombre: "Mioglobina" }, { id: "PCT", nombre: "Procalcitonina" }, { id: "IGE", nombre: "IgE Total" }, { id: "ANA", nombre: "Anticuerpos ANA" }, { id: "ADN", nombre: "Anti-DNA dc" } ],
     infecciosas: [ { id: "HBSAG", nombre: "Antígeno de Sup. Hep B" }, { id: "AHBS", nombre: "Ac. Anti-HBs" }, { id: "AHBC", nombre: "Ac. Anti-HBc Total" }, { id: "AHBCM", nombre: "Ac. Anti-HBc IgM" }, { id: "HBEAG", nombre: "Antígeno HBe" }, { id: "AHBE", nombre: "Ac. Anti-HBe" }, { id: "HCV", nombre: "Anticuerpos Hep C" }, { id: "HAVM", nombre: "Hep A IgM" }, { id: "HIV", nombre: "VIH Ag/Ab Combo" }, { id: "SYPH", nombre: "Sífilis (Treponema)" }, { id: "CHAGAS", nombre: "Chagas IgG/IgM" }, { id: "TOXOG", nombre: "Toxoplasma IgG" }, { id: "TOXOM", nombre: "Toxoplasma IgM" }, { id: "RUBG", nombre: "Rubéola IgG" }, { id: "RUBM", nombre: "Rubéola IgM" }, { id: "CMVG", nombre: "Citomegalovirus IgG" }, { id: "CMVM", nombre: "Citomegalovirus IgM" }, { id: "HSV1G", nombre: "Herpes I IgG" }, { id: "HSV2G", nombre: "Herpes II IgG" }, { id: "DENG", nombre: "Dengue NS1 Ag" }, { id: "DENGM", nombre: "Dengue IgM" }, { id: "EBVG", nombre: "Epstein-Barr VCA IgG" }, { id: "EBVM", nombre: "Epstein-Barr VCA IgM" }, { id: "HPI", nombre: "Helicobacter pylori IgG" }, { id: "COVG", nombre: "SARS-CoV-2 IgG" }, { id: "COVAG", nombre: "SARS-CoV-2 Antígeno" } ],
     marcadores: [ { id: "PSA", nombre: "PSA Total" }, { id: "PSAL", nombre: "PSA Libre" }, { id: "CEA", nombre: "Antígeno Carcinoembrionario" }, { id: "CA125", nombre: "CA 125 (Ovario)" }, { id: "CA153", nombre: "CA 15-3 (Mama)" }, { id: "CA199", nombre: "CA 19-9 (GI/Páncreas)" }, { id: "AFP", nombre: "Alfa-fetoproteína" }, { id: "B2M", nombre: "Beta-2 Microglobulina" }, { id: "HE4", nombre: "HE4 (Ovario)" }, { id: "CYFRA", nombre: "CYFRA 21-1 (Pulmón)" }, { id: "NSE", nombre: "Enolasa Específica" }, { id: "SCC", nombre: "Antígeno Células Esc." } ],
     hematologia: [ { id: "HEMO", nombre: "Hemograma Completo" }, { id: "VSG", nombre: "Velocidad de Sedimentación" }, { id: "RET", nombre: "Reticulocitos" }, { id: "GS", nombre: "Grupo y Factor Rh" }, { id: "PLA", nombre: "Recuento de Plaquetas" }, { id: "LEU", nombre: "Fórmula Leucocitaria" }, { id: "HGB", nombre: "Hemoglobina" }, { id: "HCT", nombre: "Hematocrito" }, { id: "VCM", nombre: "Índices Eritrocitarios" } ],
@@ -146,7 +146,7 @@ function buscarHistorial(ci) {
     });
 }
 
-window.copiarIDMuestra = function(id) { navigator.clipboard.writeText(id).then(() => { mostrarToast("Copiado al Portapapeles", `El ID ${id} está copiado.`); }).catch(err => alert("Error: " + err)); };
+window.copiarIDMuestra = function(id) { navigator.clipboard.writeText(id).then(() => { mostrarToast("Copiado", `El ID ${id} está copiado.`); }).catch(err => alert("Error: " + err)); };
 
 function generarOrden() {
     const ci = document.getElementById('ci').value.trim(); const nombre = document.getElementById('nombre').value.trim();
@@ -194,25 +194,19 @@ db.ref("resultados").on("value", snapshot => {
         if (!primeraCarga) {
             Object.keys(datosGlobales).forEach(key => {
                 if (!keysAnteriores.has(key)) {
-                    const r = datosGlobales[key];
-                    let nombreReal = r.paciente;
+                    const r = datosGlobales[key]; let nombreReal = r.paciente;
                     if (ordenesGlobales[r.muestra]) nombreReal = ordenesGlobales[r.muestra].nombre_paciente;
                     else if (!nombreReal || nombreReal === "Paciente Desconocido") nombreReal = "Paciente No Registrado (Huérfano)";
                     agregarNotificacion(key, nombreReal, r.muestra);
                 }
             });
         }
-        keysAnteriores = new Set(Object.keys(datosGlobales)); primeraCarga = false;
-        renderizarBandeja(); 
+        keysAnteriores = new Set(Object.keys(datosGlobales)); primeraCarga = false; renderizarBandeja(); 
         if(document.getElementById('view-estadisticas').classList.contains('active')) { calcularEstadisticas(); }
     } else { datosGlobales = {}; renderizarBandeja(); }
 });
 
-function agregarNotificacion(key, nombre, tubo) {
-    unreadCount++; notificacionesPendientes.unshift({ key: key, nombre: nombre, tubo: tubo, leido: false });
-    actualizarCampanaUI(); mostrarToast("Nuevos Resultados", `${nombre} (Tubo: ${tubo})`);
-}
-
+function agregarNotificacion(key, nombre, tubo) { unreadCount++; notificacionesPendientes.unshift({ key: key, nombre: nombre, tubo: tubo, leido: false }); actualizarCampanaUI(); mostrarToast("Nuevos Resultados", `${nombre} (Tubo: ${tubo})`); }
 function actualizarCampanaUI() {
     const badge = document.getElementById('campana-badge');
     if(unreadCount > 0) { badge.style.display = 'block'; badge.innerText = unreadCount; } else { badge.style.display = 'none'; }
@@ -221,18 +215,13 @@ function actualizarCampanaUI() {
     lista.innerHTML = "";
     notificacionesPendientes.forEach(n => { lista.innerHTML += `<div class="notif-item ${n.leido ? '' : 'unread'}" onclick="abrirDesdeNotificacion('${n.key}')"><div class="notif-title">${n.nombre}</div><div class="notif-desc">Tubo: <strong>${n.tubo}</strong></div></div>`; });
 }
-
 window.toggleNotificaciones = function() { document.getElementById('notif-dropdown').classList.toggle('active'); }
 window.marcarTodasLeidas = function(e) { e.stopPropagation(); notificacionesPendientes.forEach(n => n.leido = true); unreadCount = 0; actualizarCampanaUI(); }
 window.abrirDesdeNotificacion = function(key) {
-    document.getElementById('notif-dropdown').classList.remove('active');
-    const noti = notificacionesPendientes.find(n => n.key === key);
+    document.getElementById('notif-dropdown').classList.remove('active'); const noti = notificacionesPendientes.find(n => n.key === key);
     if(noti && !noti.leido) { noti.leido = true; unreadCount = Math.max(0, unreadCount - 1); actualizarCampanaUI(); }
-    switchView('validacion', document.querySelectorAll('.nav-item')[1]);
-    cambiarFiltroBandeja(datosGlobales[key].estado === "Validado_Final" ? "Validados" : "Pendientes");
-    setTimeout(() => mostrarDetalle(key), 100);
+    switchView('validacion', document.querySelectorAll('.nav-item')[1]); cambiarFiltroBandeja(datosGlobales[key].estado === "Validado_Final" ? "Validados" : "Pendientes"); setTimeout(() => mostrarDetalle(key), 100);
 }
-
 function mostrarToast(titulo, desc) {
     const container = document.getElementById('toast-container'); const toast = document.createElement('div'); toast.className = 'toast';
     toast.innerHTML = `<div style="font-size: 1.8rem;">🔔</div><div><div style="font-weight: 800; color: var(--aes-dark);">${titulo}</div><div style="color: var(--aes-blue); font-size: 0.85rem; font-weight: bold; margin-top:2px;">${desc}</div></div>`;
@@ -246,40 +235,24 @@ function cambiarFiltroBandeja(nuevoFiltro) {
     document.getElementById("estado-vacio").style.display = "flex"; document.getElementById("contenedor-resultados").style.display = "none";
     pacienteSeleccionadoId = null; renderizarBandeja();
 }
-
 function renderizarBandeja() {
     const lista = document.getElementById("lista-pacientes"); lista.innerHTML = ""; let keysMostradas = 0;
     Object.keys(datosGlobales).reverse().forEach(key => {
-        const r = datosGlobales[key];
-        const estaValidado = (r.estado === "Validado_Final");
-        
+        const r = datosGlobales[key]; const estaValidado = (r.estado === "Validado_Final");
         if ((filtroActual === "Pendientes" && !estaValidado) || (filtroActual === "Validados" && estaValidado)) {
-            keysMostradas++;
-            let nombreReal = r.paciente; let esHuerfano = true;
-            if (ordenesGlobales[r.muestra]) { nombreReal = ordenesGlobales[r.muestra].nombre_paciente; esHuerfano = false; } 
-            else if (r.paciente && r.paciente !== "Paciente Desconocido") { nombreReal = r.paciente; }
-            const pacienteName = esHuerfano ? "⚠️ Sin Orden" : nombreReal;
-            const estiloNombre = esHuerfano ? "color: #DC2626; font-style: italic;" : "";
+            keysMostradas++; let nombreReal = r.paciente; let esHuerfano = true;
+            if (ordenesGlobales[r.muestra]) { nombreReal = ordenesGlobales[r.muestra].nombre_paciente; esHuerfano = false; } else if (r.paciente && r.paciente !== "Paciente Desconocido") { nombreReal = r.paciente; }
+            const pacienteName = esHuerfano ? "⚠️ Sin Orden" : nombreReal; const estiloNombre = esHuerfano ? "color: #DC2626; font-style: italic;" : "";
             const badgeHuerfano = esHuerfano ? `<span style="background: #FEE2E2; color: #DC2626; padding: 3px 6px; border-radius: 4px; font-size: 0.65rem; font-weight: 800; margin-bottom: 5px; display: inline-block;">⚠️ CREADO EN EQUIPO</span>` : "";
 
-            lista.insertAdjacentHTML('beforeend', `
-                 <div class="patient-card-val ${(pacienteSeleccionadoId === key) ? 'active' : ''}" id="card-${key}" style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
-                     <div style="flex: 1;" onclick="mostrarDetalle('${key}')">
-                         ${badgeHuerfano}
-                         <div class="patient-name" style="${estiloNombre}; font-size: 0.95rem; font-weight: bold;">${pacienteName}</div>
-                         <div class="patient-meta" style="margin-top: 5px;"><span>Tubo: <strong>${r.muestra || "N/A"}</strong></span><span class="status-pill ${estaValidado ? 'val' : 'pend'}">${estaValidado ? '✔ Validado' : 'Pendiente'}</span></div>
-                     </div>
-                     <button class="btn-delete-card" onclick="borrarRegistroLIS(event, '${key}')">🗑️</button>
-                 </div>`);
+            lista.insertAdjacentHTML('beforeend', `<div class="patient-card-val ${(pacienteSeleccionadoId === key) ? 'active' : ''}" id="card-${key}" style="display: flex; justify-content: space-between; align-items: center; gap: 10px;"><div style="flex: 1;" onclick="mostrarDetalle('${key}')">${badgeHuerfano}<div class="patient-name" style="${estiloNombre}; font-size: 0.95rem; font-weight: bold;">${pacienteName}</div><div class="patient-meta" style="margin-top: 5px;"><span>Tubo: <strong>${r.muestra || "N/A"}</strong></span><span class="status-pill ${estaValidado ? 'val' : 'pend'}">${estaValidado ? '✔ Validado' : 'Pendiente'}</span></div></div><button class="btn-delete-card" onclick="borrarRegistroLIS(event, '${key}')">🗑️</button></div>`);
         }
     });
     if (keysMostradas === 0) lista.innerHTML = `<div style="padding: 30px; text-align: center; color: #888;">No hay informes aquí.</div>`;
 }
-
 function mostrarDetalle(key) {
     pacienteSeleccionadoId = key; const r = datosGlobales[key]; const estaValidado = (r.estado === "Validado_Final");
-    document.querySelectorAll('.patient-card-val').forEach(el => el.classList.remove('active'));
-    document.getElementById(`card-${key}`).classList.add('active');
+    document.querySelectorAll('.patient-card-val').forEach(el => el.classList.remove('active')); document.getElementById(`card-${key}`).classList.add('active');
     document.getElementById("estado-vacio").style.display = "none"; document.getElementById("contenedor-resultados").style.display = "block";
 
     if(estaValidado) { document.getElementById('botones-pendientes').style.display = "none"; document.getElementById('botones-validados').style.display = "flex"; document.getElementById('badge-estado-visor').innerText = "✔ ARCHIVADO"; } 
@@ -287,261 +260,4 @@ function mostrarDetalle(key) {
 
     let nombreReal = r.paciente; let esHuerfano = true; let parametrosPedidos = "No registrados";
     if (ordenesGlobales[r.muestra]) { nombreReal = ordenesGlobales[r.muestra].nombre_paciente; parametrosPedidos = ordenesGlobales[r.muestra].examenes ? ordenesGlobales[r.muestra].examenes.join(", ") : ""; esHuerfano = false; }
-    document.getElementById("detalle-nombre").innerText = esHuerfano ? "Paciente de Urgencia (Equipo)" : nombreReal;
-    document.getElementById("detalle-muestra").innerText = r.muestra || "N/A"; document.getElementById("detalle-equipo").innerText = r.equipo || "Analizador LIS";
-    document.getElementById("pdf-paciente").innerText = esHuerfano ? "Paciente No Registrado" : nombreReal; document.getElementById("pdf-orden").innerText = r.muestra || "N/A"; document.getElementById("pdf-equipo").innerText = r.equipo || "N/A";
-    document.getElementById("pdf-fecha").innerText = r.fecha_validacion ? new Date(r.fecha_validacion).toLocaleString() : new Date().toLocaleString();
-
-    const tablaLIS = document.getElementById("tabla-analitos"); const contPDF = document.getElementById("pdf-resultados-dinamicos");
-    tablaLIS.innerHTML = ""; contPDF.innerHTML = "";
-
-    if(!esHuerfano) tablaLIS.insertAdjacentHTML('beforeend', `<tr><td colspan="3" style="background: #FFFBEB; padding: 10px; color: #B45309; font-size: 0.8rem;"><strong>Pruebas Solicitadas en Web:</strong> ${parametrosPedidos}</td></tr>`);
-
-    const resRaw = r.resultados_totales || r.resultados || r.resultaos || "";
-    if(resRaw !== "") {
-        let arr = {};
-        resRaw.split('~').forEach(linea => {
-            if(linea.trim() === "") return; 
-            const p = linea.split(':'); const n = p[0].trim(); let valU = p.slice(1).join(':').trim(); 
-            let vNum = valU; let uStr = ""; const sep = valU.indexOf(' ');
-            if(sep > -1) { vNum = valU.substring(0, sep).trim(); uStr = valU.substring(sep).trim(); }
-            const info = obtenerInfoPrueba(n); if(!arr[info.cat]) arr[info.cat] = []; arr[info.cat].push({ n: n, v: vNum, u: uStr, ref: info.ref });
-        });
-
-        Object.keys(arr).forEach(cat => {
-            tablaLIS.insertAdjacentHTML('beforeend', `<tr style="background: #F3E8FF;"><td colspan="3" style="padding: 10px 20px; font-weight: 800; color: var(--aes-purple); font-size: 0.85rem;">🏷️ ${cat}</td></tr>`);
-            let h = `<div class="pdf-banda-color">${cat}</div><table class="pdf-table"><thead><tr><th style="width:30%;">EXAMEN</th><th style="width:20%;">RESULTADO</th><th style="width:20%;">UNIDAD</th><th style="width:30%;">REFERENCIA</th></tr></thead><tbody>`;
-            arr[cat].forEach(res => {
-                tablaLIS.insertAdjacentHTML('beforeend', `<tr><td style="padding-left: 35px;"><strong>${res.n}</strong></td><td style="font-family: monospace; font-size:1.1rem;">${res.v}</td><td><span class="unit-badge">${res.u || '-'}</span></td></tr>`);
-                h += `<tr><td><b>${res.n}</b></td><td style="font-family:monospace; font-size:13px; font-weight:bold;">${res.v}</td><td style="color:#666;">${res.u || '-'}</td><td style="color:#888; font-size:11px;">${res.ref}</td></tr>`;
-            });
-            h += `</tbody></table>`; contPDF.insertAdjacentHTML('beforeend', h);
-        });
-    } else { tablaLIS.innerHTML = `<tr><td colspan="3" style="text-align: center; padding: 20px;">Sin resultados</td></tr>`; contPDF.innerHTML = `<p>No hay resultados analíticos disponibles.</p>`; }
-}
-
-function descargarSoloPDF(forzarValidacion = false) {
-    const btn = document.querySelector(forzarValidacion ? '.btn-validate-pdf' : '.btn-reprint'); const tOriginal = btn.innerHTML; btn.innerHTML = "⏳ Generando...";
-    const pw = document.getElementById('pdf-container'); const ep = document.getElementById('plantilla-pdf');
-    pw.style.display = 'block'; pw.style.position = 'absolute'; pw.style.zIndex = '-100';
-    const opt = { margin: 10, filename: `Informe_AES_${document.getElementById('pdf-paciente').innerText.replace(/\s+/g, '_')}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }, pagebreak: { mode: ['avoid-all', 'css', 'legacy'] } };
-    html2pdf().set(opt).from(ep).save().then(() => { pw.style.display = 'none'; btn.innerHTML = tOriginal; if(forzarValidacion) db.ref("resultados/" + pacienteSeleccionadoId).update({ estado: "Validado_Final", fecha_validacion: new Date().toISOString() }).then(() => cambiarFiltroBandeja('Validados')); });
-}
-function validarYGenerarPDF() { if(pacienteSeleccionadoId && confirm("¿Liberar reporte médico?")) descargarSoloPDF(true); }
-function revertirValidacion() { if(pacienteSeleccionadoId && confirm("¿Regresar a Pendientes?")) db.ref("resultados/" + pacienteSeleccionadoId).update({ estado: "Pendiente Validacion" }).then(() => cambiarFiltroBandeja('Pendientes')); }
-function rechazarMuestra() { if(pacienteSeleccionadoId && confirm("¿RECHAZAR y ELIMINAR?")) db.ref("resultados/" + pacienteSeleccionadoId).remove().then(() => cambiarFiltroBandeja('Pendientes')); }
-function borrarRegistroLIS(event, key) { event.stopPropagation(); if(confirm("¿ELIMINAR permanentemente?")) db.ref("resultados/" + key).remove(); }
-
-
-// === MÓDULO DE ESTADÍSTICAS Y DRILL-DOWN (PROFUNDIZACIÓN) ===
-
-window.filtrarTablaParametros = function() {
-    const filtro = document.getElementById('buscador-parametros').value.toUpperCase();
-    const filas = document.querySelectorAll('#tabla-estadisticas tr');
-    filas.forEach(fila => {
-        if(fila.cells.length < 2) return; // Saltamos la fila de "No hay datos"
-        const parametro = fila.cells[0].innerText.toUpperCase();
-        fila.style.display = parametro.includes(filtro) ? '' : 'none';
-    });
-};
-
-window.calcularEstadisticas = function() {
-    const fechaIniStr = document.getElementById('filtro-fecha-inicio').value;
-    const fechaFinStr = document.getElementById('filtro-fecha-fin').value;
-    if(!fechaIniStr || !fechaFinStr) return alert("Seleccione el rango de fechas");
-
-    const fInicio = new Date(fechaIniStr + "T00:00:00");
-    const fFin = new Date(fechaFinStr + "T23:59:59");
-    let totalTubos = 0; let conteoPruebas = {};
-
-    Object.keys(datosGlobales).forEach(key => {
-        const registro = datosGlobales[key];
-        const muestraID = registro.muestra || ""; 
-        
-        let fechaMuestra = null;
-        if(muestraID.length >= 6) {
-            const yy = "20" + muestraID.substring(0, 2); const mm = muestraID.substring(2, 4); const dd = muestraID.substring(4, 6);
-            fechaMuestra = new Date(`${yy}-${mm}-${dd}T12:00:00`);
-        }
-
-        if(fechaMuestra && fechaMuestra >= fInicio && fechaMuestra <= fFin) {
-            totalTubos++;
-            const resRaw = registro.resultados_totales || registro.resultados || registro.resultaos || "";
-            if(resRaw !== "") {
-                resRaw.split('~').forEach(linea => {
-                    if(linea.trim() === "") return; 
-                    const p = linea.split(':'); const nombrePrueba = p[0].trim();
-                    if(!conteoPruebas[nombrePrueba]) conteoPruebas[nombrePrueba] = 0;
-                    conteoPruebas[nombrePrueba]++;
-                });
-            }
-        }
-    });
-
-    document.getElementById('stat-total-tubos').innerText = totalTubos;
-    const tabla = document.getElementById('tabla-estadisticas'); tabla.innerHTML = "";
-
-    if (Object.keys(conteoPruebas).length === 0) {
-        document.getElementById('stat-top-prueba').innerText = "---";
-        tabla.innerHTML = `<tr><td colspan="2" style="text-align: center; padding: 20px; color: #888;">No hay resultados en estas fechas.</td></tr>`;
-        return;
-    }
-
-    const pruebasOrdenadas = Object.entries(conteoPruebas).sort((a, b) => b[1] - a[1]);
-    document.getElementById('stat-top-prueba').innerText = pruebasOrdenadas[0][0];
-
-    pruebasOrdenadas.forEach(([prueba, cantidad]) => {
-        // AQUÍ INYECTAMOS EL BOTÓN CON LA LUPA PARA HACER DRILL-DOWN
-        tabla.innerHTML += `
-            <tr>
-                <td><strong>${prueba}</strong></td>
-                <td>
-                    <button onclick="verDetallePrueba('${prueba}')" style="cursor:pointer; background: #E0F2FE; color: var(--aes-blue); font-weight: bold; padding: 5px 12px; border-radius: 20px; border: 1px solid var(--aes-blue); transition: 0.2s;">
-                        ${cantidad} Test(s) 🔍
-                    </button>
-                </td>
-            </tr>
-        `;
-    });
-};
-
-// === VARIABLES PARA LA VENTANA MODAL GIGANTE ===
-let datosPruebaActual = [];
-let datosFiltradosModal = [];
-let paginaActual = 1;
-let itemsPorPagina = 30;
-
-window.verDetallePrueba = function(pruebaId) {
-    document.getElementById('modal-detalle-titulo').innerText = `Detalle de Pacientes - Parámetro: ${pruebaId}`;
-    
-    // Limpiamos los filtros del modal antes de abrir
-    document.getElementById('filtro-modal-paciente').value = "";
-    document.getElementById('filtro-modal-fecha').value = "";
-    
-    datosPruebaActual = [];
-    
-    const fechaIniStr = document.getElementById('filtro-fecha-inicio').value;
-    const fechaFinStr = document.getElementById('filtro-fecha-fin').value;
-    const fInicio = new Date(fechaIniStr + "T00:00:00");
-    const fFin = new Date(fechaFinStr + "T23:59:59");
-
-    // Recolectamos a todos los pacientes que se hicieron ESTA prueba en ESTA fecha
-    Object.keys(datosGlobales).forEach(key => {
-        const registro = datosGlobales[key];
-        const muestraID = registro.muestra || ""; 
-        
-        let fechaMuestra = null;
-        if(muestraID.length >= 6) {
-            const yy = "20" + muestraID.substring(0, 2); const mm = muestraID.substring(2, 4); const dd = muestraID.substring(4, 6);
-            fechaMuestra = new Date(`${yy}-${mm}-${dd}T12:00:00`);
-        }
-
-        if(fechaMuestra && fechaMuestra >= fInicio && fechaMuestra <= fFin) {
-            const resRaw = registro.resultados_totales || registro.resultados || registro.resultaos || "";
-            if(resRaw !== "") {
-                let valorPrueba = null;
-                // Buscamos si el string de resultados tiene el parámetro exacto
-                resRaw.split('~').forEach(linea => {
-                    if(linea.trim() === "") return; 
-                    const p = linea.split(':'); const nombreParam = p[0].trim();
-                    if(nombreParam.toUpperCase() === pruebaId.toUpperCase()) {
-                        valorPrueba = p.slice(1).join(':').trim(); // Sacamos el número y la unidad (Ej: 95 mg/dL)
-                    }
-                });
-
-                if(valorPrueba !== null) {
-                    // Si lo encontró, cruzamos el nombre con las órdenes igual que en la bandeja
-                    let nombreReal = registro.paciente;
-                    if (ordenesGlobales[registro.muestra]) { nombreReal = ordenesGlobales[registro.muestra].nombre_paciente; } 
-                    else if (!nombreReal || nombreReal === "Paciente Desconocido") { nombreReal = "⚠️ Sin Orden Web"; }
-
-                    datosPruebaActual.push({
-                        fecha: fechaMuestra.toLocaleDateString(),
-                        tubo: registro.muestra || "N/A",
-                        paciente: nombreReal,
-                        valor: valorPrueba,
-                        estado: registro.estado === "Validado_Final" ? "✔ Validado" : "Pendiente"
-                    });
-                }
-            }
-        }
-    });
-
-    document.getElementById('modal-detalle-prueba').style.display = 'flex';
-    aplicarFiltrosModal(); // Esto renderiza la primera página
-};
-
-window.cerrarModalDetalle = function() {
-    document.getElementById('modal-detalle-prueba').style.display = 'none';
-};
-
-window.aplicarFiltrosModal = function() {
-    const filtroTexto = document.getElementById('filtro-modal-paciente').value.toUpperCase();
-    const filtroFecha = document.getElementById('filtro-modal-fecha').value; // Formato YYYY-MM-DD
-    
-    let fechaBuscadaFormat = "";
-    if(filtroFecha) {
-        // Convertimos el input de fecha (Ej: 2026-10-19) al formato de la tabla (19/10/2026 o similar, dependiendo del locale)
-        const d = new Date(filtroFecha + "T12:00:00");
-        fechaBuscadaFormat = d.toLocaleDateString();
-    }
-
-    datosFiltradosModal = datosPruebaActual.filter(item => {
-        const coincideTexto = item.paciente.toUpperCase().includes(filtroTexto) || item.tubo.includes(filtroTexto);
-        const coincideFecha = filtroFecha === "" || item.fecha === fechaBuscadaFormat;
-        return coincideTexto && coincideFecha;
-    });
-
-    paginaActual = 1;
-    renderizarPaginacion();
-};
-
-window.cambiarItemsPorPagina = function() {
-    itemsPorPagina = parseInt(document.getElementById('select-paginacion').value);
-    paginaActual = 1;
-    renderizarPaginacion();
-};
-
-window.cambiarPagina = function(direccion) {
-    paginaActual += direccion;
-    renderizarPaginacion();
-};
-
-window.renderizarPaginacion = function() {
-    const totalPaginas = Math.ceil(datosFiltradosModal.length / itemsPorPagina) || 1;
-    
-    // Asegurarnos de que no nos pasemos de página
-    if (paginaActual < 1) paginaActual = 1;
-    if (paginaActual > totalPaginas) paginaActual = totalPaginas;
-
-    // Calcular el slice de datos
-    const inicio = (paginaActual - 1) * itemsPorPagina;
-    const fin = inicio + itemsPorPagina;
-    const datosPagina = datosFiltradosModal.slice(inicio, fin);
-
-    // Renderizar la tabla del modal
-    const tabla = document.getElementById('tabla-modal-detalle');
-    tabla.innerHTML = "";
-
-    if (datosPagina.length === 0) {
-        tabla.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 20px; color: #888;">No se encontraron pacientes para este parámetro.</td></tr>`;
-    } else {
-        datosPagina.forEach(item => {
-            const colorEstado = item.estado.includes("Validado") ? "color: var(--success);" : "color: var(--warning);";
-            tabla.innerHTML += `
-                <tr>
-                    <td>${item.fecha}</td>
-                    <td><strong>${item.tubo}</strong></td>
-                    <td>${item.paciente}</td>
-                    <td style="font-family: monospace; font-weight: bold; font-size: 1.05rem;">${item.valor}</td>
-                    <td style="${colorEstado} font-weight: bold;">${item.estado}</td>
-                </tr>
-            `;
-        });
-    }
-
-    // Actualizar botones y etiquetas de paginación
-    document.getElementById('lbl-pagina-actual').innerText = `Pág ${paginaActual} de ${totalPaginas}`;
-    document.getElementById('btn-prev-page').disabled = (paginaActual === 1);
-    document.getElementById('btn-next-page').disabled = (paginaActual === totalPaginas);
-};
+    document.getElementById("detalle-nombre").innerText = esHuerfano ? "Paciente de Urgencia (Equipo)" : nombreReal
