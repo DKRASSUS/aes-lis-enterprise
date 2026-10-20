@@ -39,15 +39,28 @@ function switchView(viewId, element) {
 }
 
 // === CEREBRO AUTÓNOMO: CONFIGURACIÓN DINÁMICA ===
-let configSeguros = {}; let configPrecios = {};
+let configSeguros = {}; let configPrecios = {}; let configLab = { nombre: "Laboratorio Clínico", telefono: "", direccion: "" };
 
 db.ref("configuracion").on("value", snapshot => {
     if (snapshot.exists()) {
         const data = snapshot.val();
-        configSeguros = data.seguros || { "Particular": 0 }; configPrecios = data.precios || { "GLU": 25, "HEMO": 60 };
+        configSeguros = data.seguros || { "Particular": 0 }; 
+        configPrecios = data.precios || { "GLU": 25, "HEMO": 60 };
+        configLab = data.laboratorio || { nombre: "Laboratorio Clínico", telefono: "", direccion: "" };
         renderizarConfiguracion(); actualizarSelectSeguros();
-    } else { db.ref("configuracion").set({ seguros: { "Particular": 0 }, precios: { "GLU": 25 } }); }
+    } else { 
+        db.ref("configuracion").set({ seguros: { "Particular": 0 }, precios: { "GLU": 25 }, laboratorio: configLab }); 
+    }
 });
+
+function guardarPerfilLab() {
+    const n = document.getElementById('conf-lab-nombre').value.trim();
+    const t = document.getElementById('conf-lab-telefono').value.trim();
+    const d = document.getElementById('conf-lab-direccion').value.trim();
+    if(!n) return alert("El nombre del laboratorio es obligatorio.");
+    db.ref("configuracion/laboratorio").set({ nombre: n, telefono: t, direccion: d });
+    mostrarToast("Perfil Actualizado", "Datos del laboratorio guardados.");
+}
 
 function guardarSeguro() {
     const nombre = document.getElementById('conf-seguro-nombre').value.trim(); const desc = parseFloat(document.getElementById('conf-seguro-desc').value);
@@ -65,6 +78,10 @@ function guardarPrueba() {
 function eliminarPrueba(id) { if(confirm(`¿Borrar ${id}?`)) db.ref(`configuracion/precios/${id}`).remove(); }
 
 function renderizarConfiguracion() {
+    document.getElementById('conf-lab-nombre').value = configLab.nombre || "";
+    document.getElementById('conf-lab-telefono').value = configLab.telefono || "";
+    document.getElementById('conf-lab-direccion').value = configLab.direccion || "";
+
     const tablaS = document.getElementById('tabla-conf-seguros'); tablaS.innerHTML = "";
     Object.keys(configSeguros).forEach(nombre => { tablaS.innerHTML += `<tr><td>${nombre}</td><td>${configSeguros[nombre]}%</td><td><button onclick="eliminarSeguro('${nombre}')" style="color:red; background:none; border:none; cursor:pointer;">🗑️</button></td></tr>`; });
     const tablaP = document.getElementById('tabla-conf-pruebas'); tablaP.innerHTML = "";
@@ -295,7 +312,6 @@ function revertirValidacion() { if(pacienteSeleccionadoId && confirm("¿Regresar
 function rechazarMuestra() { if(pacienteSeleccionadoId && confirm("¿RECHAZAR y ELIMINAR?")) db.ref("resultados/" + pacienteSeleccionadoId).remove().then(() => cambiarFiltroBandeja('Pendientes')); }
 function borrarRegistroLIS(event, key) { event.stopPropagation(); if(confirm("¿ELIMINAR permanentemente?")) db.ref("resultados/" + key).remove(); }
 
-
 // === ESTADÍSTICAS Y DRILL-DOWN ===
 window.filtrarTablaParametros = function() {
     const filtro = document.getElementById('buscador-parametros').value.toUpperCase();
@@ -306,7 +322,6 @@ window.filtrarTablaParametros = function() {
         fila.style.display = parametro.includes(filtro) ? '' : 'none';
     });
 };
-
 window.calcularEstadisticas = function() {
     const fechaIniStr = document.getElementById('filtro-fecha-inicio').value; const fechaFinStr = document.getElementById('filtro-fecha-fin').value;
     if(!fechaIniStr || !fechaFinStr) return alert("Seleccione el rango de fechas");
@@ -352,7 +367,6 @@ let datosPruebaActual = []; let datosFiltradosModal = []; let paginaActual = 1; 
 window.verDetallePrueba = function(pruebaId) {
     document.getElementById('modal-detalle-titulo').innerText = `Detalle de Pacientes - Parámetro: ${pruebaId}`;
     document.getElementById('filtro-modal-paciente').value = ""; document.getElementById('filtro-modal-fecha').value = ""; datosPruebaActual = [];
-    
     const fInicio = new Date(document.getElementById('filtro-fecha-inicio').value + "T00:00:00");
     const fFin = new Date(document.getElementById('filtro-fecha-fin').value + "T23:59:59");
 
@@ -454,6 +468,7 @@ window.guardarInventario = function() {
         document.getElementById('inv-lote').value = ""; document.getElementById('inv-vencimiento').value = ""; document.getElementById('inv-stock').value = ""; document.getElementById('inv-minimo').value = ""; 
         document.getElementById('inv-distribuidor').value = ""; document.getElementById('inv-cant-pedido').value = ""; document.getElementById('inv-correo').value = ""; document.getElementById('inv-telefono').value = ""; 
         document.getElementById('inv-autopedido').checked = false;
+        verificarStockYPedir(codigo, item);
     });
 };
 
@@ -495,10 +510,7 @@ window.sumarStock = function(codigo) {
         if(num > 0) {
             const stockActualizado = item.stock + num;
             if(confirm(`Resumen de Ingreso:\nStock Anterior: ${item.stock}\nCantidad Añadida: +${num}\nNUEVO STOCK TOTAL: ${stockActualizado}\n\n¿Confirmar?`)) {
-                db.ref("inventario/" + codigo + "/stock").set(stockActualizado).then(() => {
-                    item.stock = stockActualizado;
-                    mostrarToast("Inventario", `Se agregaron ${num} unidades de ${item.nombre}.`);
-                });
+                db.ref("inventario/" + codigo + "/stock").set(stockActualizado).then(() => { item.stock = stockActualizado; mostrarToast("Inventario", `Se agregaron ${num} unidades de ${item.nombre}.`); });
             }
         }
     }
@@ -513,11 +525,7 @@ window.restarStock = function(codigo) {
             const stockActualizado = item.stock - num;
             if(stockActualizado < 0) return alert("Error: No puede retirar más unidades de las que hay en stock.");
             if(confirm(`Resumen de Retiro:\nStock Anterior: ${item.stock}\nCantidad Retirada: -${num}\nNUEVO STOCK TOTAL: ${stockActualizado}\n\n¿Confirmar?`)) {
-                db.ref("inventario/" + codigo + "/stock").set(stockActualizado).then(() => {
-                    item.stock = stockActualizado;
-                    mostrarToast("Inventario", `Se retiraron ${num} unidades de ${item.nombre}.`);
-                    verificarStockYPedir(codigo, item);
-                });
+                db.ref("inventario/" + codigo + "/stock").set(stockActualizado).then(() => { item.stock = stockActualizado; mostrarToast("Inventario", `Se retiraron ${num} unidades de ${item.nombre}.`); verificarStockYPedir(codigo, item); });
             }
         }
     }
@@ -527,12 +535,20 @@ function verificarStockYPedir(codigo, item) {
     if(item.autopedido && item.stock <= item.minimo) {
         const hoyStr = new Date().toISOString().split('T')[0];
         if(item.ultimo_pedido !== hoyStr) {
-            const webhookMake = "https://hook.make.com/TU_WEBHOOK_AQUI"; 
             
-            console.log(`Disparando Auto-Pedido a Make para ${item.nombre}...`);
-            mostrarToast("Auto-Pedido Disparado", `Enviando alerta a proveedor por ${item.nombre}`);
-            db.ref("inventario/" + codigo + "/ultimo_pedido").set(hoyStr);
+            // === AQUÍ PONES TU ENLACE DE MAKE.COM ===
+            const webhookMake = "https://hook.make.com/https://hook.us2.make.com/stfloirdmkzy7q9pm60ucb9241b8l39j"; 
             
+            // El LIS redacta la carta formal
+            const mensajeFormal = `Estimados señores de ${item.distribuidor !== "N/A" ? item.distribuidor : "Ventas"},\n\n` +
+                                  `Por medio de la presente, el laboratorio *${configLab.nombre}* solicita cordialmente el abastecimiento del siguiente producto para nuestro inventario:\n\n` +
+                                  `📦 *Producto:* ${item.nombre} ${item.presentacion !== "N/A" ? '('+item.presentacion+')' : ''}\n` +
+                                  `🔖 *Marca:* ${item.marca}\n` +
+                                  `🔢 *Código / Ref:* ${item.codigo}\n` +
+                                  `🛒 *Cantidad Solicitada:* ${item.cantidad_pedido} unidades/cajas\n\n` +
+                                  `Por favor, confirmar la recepción de este pedido y el tiempo estimado de entrega a nuestras instalaciones en: ${configLab.direccion}.\n\n` +
+                                  `Atentamente,\n*${configLab.nombre}*\nTeléfono: ${configLab.telefono}`;
+
             const payload = { 
                 codigo: item.codigo, 
                 producto: item.nombre, 
@@ -543,15 +559,21 @@ function verificarStockYPedir(codigo, item) {
                 distribuidor: item.distribuidor,
                 correo_proveedor: item.correo_proveedor,
                 telefono_proveedor: item.telefono_proveedor,
+                laboratorio_nombre: configLab.nombre,
+                laboratorio_telefono: configLab.telefono,
+                mensaje_formal: mensajeFormal,
                 fecha: new Date().toLocaleString() 
             };
             
-            /* Para activarlo de verdad en Make, descomenta esto:
+            console.log(`Disparando Auto-Pedido a Make para ${item.nombre}...`);
+            mostrarToast("Auto-Pedido Disparado", `Enviando alerta a proveedor por ${item.nombre}`);
+            db.ref("inventario/" + codigo + "/ultimo_pedido").set(hoyStr);
+            
+            // ESTO ENVÍA EL DATO A MAKE (Se activará cuando pongas tu enlace arriba)
             fetch(webhookMake, {
                 method: "POST", headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
-            });
-            */
+            }).catch(e => console.log("Aún no se ha configurado el webhook de Make."));
         }
     }
 }
