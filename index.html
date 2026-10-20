@@ -135,7 +135,7 @@
                 </div>
             </div>
 
-            <!-- VISTA 4: INVENTARIO (CON COMPRAS) -->
+            <!-- VISTA 4: INVENTARIO -->
             <div id="view-inventario" class="view-section">
                 <div class="panel panel-blue">
                     <h3 class="panel-title">📦 Gestión de Inventario y Compras Automáticas</h3>
@@ -148,7 +148,7 @@
                         </div>
                         <div class="form-row" style="margin-bottom: 15px;">
                             <div class="form-group" style="margin:0;"><label>Marca (Opcional)</label><input type="text" id="inv-marca" placeholder="Ej: DiaSys"></div>
-                            <div class="form-group" style="margin:0;"><label>Presentación (Opcional)</label><input type="text" id="inv-presentacion" placeholder="Ej: 500 Test"></div>
+                            <div class="form-group" style="margin:0;"><label>Presentación (Opcional)</label><input type="text" id="inv-presentacion" placeholder="Ej: 500 Test / 4x25mL"></div>
                         </div>
                         
                         <h4 style="margin-top: 15px; margin-bottom: 10px; color: var(--aes-blue); font-size: 0.9rem;">Control de Lotes</h4>
@@ -175,7 +175,7 @@
                             <input type="checkbox" id="inv-autopedido" style="width: 20px; height: 20px; cursor: pointer;">
                             <label style="margin: 0; cursor: pointer; color: var(--aes-purple); font-size: 0.85rem;" for="inv-autopedido">
                                 🤖 <strong>Habilitar Auto-Pedido Inteligente (vía Make.com)</strong><br>
-                                Si el stock llega al límite, el LIS usará el Correo/WhatsApp del proveedor para solicitar automáticamente la cantidad definida.
+                                Si el stock llega al límite, el LIS usará el Correo/WhatsApp del proveedor para enviar una carta formal de pedido automáticamente.
                             </label>
                         </div>
                         <button class="btn-success-adm" style="margin-top:20px; padding: 12px;" onclick="guardarInventario()">📥 Guardar Insumo en Inventario</button>
@@ -191,6 +191,18 @@
 
             <!-- VISTA 5: CONFIGURACIÓN -->
             <div id="view-configuracion" class="view-section">
+                <!-- NUEVO: PERFIL DEL LABORATORIO -->
+                <div class="panel panel-blue" style="border-top-color: var(--aes-purple); margin-bottom: 25px;">
+                    <h3 class="panel-title" style="color: var(--aes-purple);">🏥 Perfil de Mi Laboratorio (Firma Comercial)</h3>
+                    <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">Estos datos se usarán para firmar automáticamente los correos y mensajes de WhatsApp enviados a tus proveedores cuando se requieran reactivos.</p>
+                    <div class="form-row">
+                        <div class="form-group"><label>Nombre Comercial de la Clínica / Laboratorio</label><input type="text" id="conf-lab-nombre" placeholder="Ej: Clínica de las Américas"></div>
+                        <div class="form-group"><label>Teléfono de Contacto (Compras)</label><input type="text" id="conf-lab-telefono" placeholder="Ej: +591 77712345"></div>
+                    </div>
+                    <div class="form-group"><label>Dirección de Entrega</label><input type="text" id="conf-lab-direccion" placeholder="Ej: Av. Principal #123, Santa Cruz"></div>
+                    <button class="btn-success-adm" style="background-color: var(--aes-purple); margin-top:0; padding: 10px;" onclick="guardarPerfilLab()">Guardar Perfil de Laboratorio</button>
+                </div>
+
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                     <div class="panel panel-blue">
                         <h3 class="panel-title">🛡️ Gestión de Seguros y Descuentos</h3>
