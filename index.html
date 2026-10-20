@@ -47,6 +47,8 @@
             <div class="nav-item active" onclick="switchView('admision', this)">🏥 Admisión y Órdenes</div>
             <div class="nav-item" onclick="switchView('validacion', this)">🔬 Validación Médica</div>
             <div class="nav-item" onclick="switchView('estadisticas', this)">📊 Estadísticas</div>
+            <!-- NUEVO: MÓDULO INVENTARIO -->
+            <div class="nav-item" onclick="switchView('inventario', this)">📦 Inventario</div>
             <div class="nav-item" onclick="switchView('configuracion', this)" style="margin-top: 20px; border-top: 1px solid var(--border-color);">⚙️ Configuración</div>
         </nav>
 
@@ -132,7 +134,6 @@
 
                     <h4 style="color: var(--aes-dark); border-bottom: 2px solid var(--border-color); padding-bottom: 10px; margin-bottom: 15px;">Desglose por Prueba</h4>
                     
-                    <!-- NUEVO: BUSCADOR DE PARÁMETROS -->
                     <input type="text" id="buscador-parametros" class="stat-search-box" placeholder="🔍 Buscar parámetro específico (Ej: GLU, CREA...)" onkeyup="filtrarTablaParametros()">
                     
                     <table class="history-table">
@@ -142,7 +143,42 @@
                 </div>
             </div>
 
-            <!-- VISTA 4: CONFIGURACIÓN -->
+            <!-- VISTA 4: INVENTARIO (NUEVA FASE) -->
+            <div id="view-inventario" class="view-section">
+                <div class="panel panel-blue">
+                    <h3 class="panel-title">📦 Gestión de Inventario y Auto-Pedidos</h3>
+                    <div style="background: #F8FAFC; padding: 20px; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 20px;">
+                        <div class="form-row" style="margin-bottom: 15px;">
+                            <div class="form-group" style="margin:0;"><label>Nombre del Reactivo/Insumo</label><input type="text" id="inv-nombre" placeholder="Ej: Reactivo Glucosa FS"></div>
+                            <div class="form-group" style="margin:0;"><label>Código Interno</label><input type="text" id="inv-codigo" placeholder="Ej: REA-GLU-01"></div>
+                        </div>
+                        <div class="form-row" style="margin-bottom: 15px;">
+                            <div class="form-group" style="margin:0;"><label>Número de Lote</label><input type="text" id="inv-lote" placeholder="Ej: L-2026A"></div>
+                            <div class="form-group" style="margin:0;"><label>Fecha de Vencimiento</label><input type="date" id="inv-vencimiento"></div>
+                        </div>
+                        <div class="form-row" style="margin-bottom: 15px;">
+                            <div class="form-group" style="margin:0;"><label>Stock Actual (Unidades)</label><input type="number" id="inv-stock" placeholder="Ej: 5"></div>
+                            <div class="form-group" style="margin:0;"><label>Stock Mínimo de Alerta</label><input type="number" id="inv-minimo" placeholder="Ej: 2"></div>
+                        </div>
+                        <div class="form-group" style="background: white; padding: 15px; border-radius: 6px; border: 1px dashed var(--border-color); display: flex; align-items: center; gap: 10px;">
+                            <input type="checkbox" id="inv-autopedido" style="width: 20px; height: 20px; cursor: pointer;">
+                            <label style="margin: 0; cursor: pointer; color: var(--aes-purple); font-size: 0.85rem;" for="inv-autopedido">
+                                🤖 <strong>Habilitar Auto-Pedido a Proveedor (vía Make.com)</strong><br>
+                                Si el stock llega al límite mínimo, el LIS enviará automáticamente un WhatsApp/Email al proveedor.
+                            </label>
+                        </div>
+                        <button class="btn-success-adm" style="margin-top:20px; padding: 12px;" onclick="guardarInventario()">📥 Añadir / Actualizar Producto</button>
+                    </div>
+
+                    <h4 style="color: var(--aes-dark); border-bottom: 2px solid var(--border-color); padding-bottom: 10px;">Stock de Laboratorio</h4>
+                    <table class="history-table">
+                        <thead><tr><th>Código</th><th>Producto / Lote</th><th>Vencimiento</th><th>Stock</th><th>Auto-Pedido</th><th>Acciones</th></tr></thead>
+                        <tbody id="tabla-inventario"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- VISTA 5: CONFIGURACIÓN -->
             <div id="view-configuracion" class="view-section">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                     <div class="panel panel-blue">
@@ -163,10 +199,9 @@
         </main>
     </div>
 
-    <!-- Modal Pruebas Admisión -->
+    <!-- Modales -->
     <div class="modal-overlay" id="modal-pruebas"><div class="modal-content"><div class="modal-header"><h3 id="modal-titulo">Pruebas</h3><button class="btn-close" onclick="cerrarModal()">×</button></div><div class="modal-body"><div class="test-grid" id="modal-grid"></div></div><div class="modal-footer"><button class="btn-save-modal" onclick="cerrarModal()">Confirmar</button></div></div></div>
     
-    <!-- NUEVO: MODAL DE PROFUNDIZACIÓN (DRILL-DOWN) -->
     <div class="modal-overlay" id="modal-detalle-prueba">
         <div class="modal-content" style="max-width: 1000px; max-height: 90vh;">
             <div class="modal-header">
@@ -174,19 +209,15 @@
                 <button class="btn-close" onclick="cerrarModalDetalle()">×</button>
             </div>
             <div class="modal-body" style="padding: 20px 30px;">
-                <!-- Filtros del Modal -->
                 <div class="form-row" style="margin-bottom: 20px; background: #F8FAFC; padding: 15px; border-radius: 6px; border: 1px solid var(--border-color);">
                     <div class="form-group" style="margin-bottom: 0;"><label>Buscar Paciente / Tubo</label><input type="text" id="filtro-modal-paciente" placeholder="🔍 Escribe nombre o número..." onkeyup="aplicarFiltrosModal()"></div>
                     <div class="form-group" style="margin-bottom: 0;"><label>Fecha Exacta (Opcional)</label><input type="date" id="filtro-modal-fecha" onchange="aplicarFiltrosModal()"></div>
                 </div>
-                
-                <!-- Tabla del Modal -->
                 <table class="history-table">
                     <thead><tr><th>Fecha / Hora</th><th>Tubo ID</th><th>Nombre del Paciente</th><th>Valor Obtenido</th><th>Estado</th></tr></thead>
                     <tbody id="tabla-modal-detalle"></tbody>
                 </table>
             </div>
-            <!-- Paginación -->
             <div class="pagination-controls">
                 <div>
                     <label style="font-size: 0.8rem; font-weight: bold; margin-right: 10px; color: #555;">Mostrar:</label>
