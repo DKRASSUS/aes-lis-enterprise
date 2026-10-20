@@ -30,7 +30,6 @@ function switchView(viewId, element) {
     document.getElementById('view-' + viewId).classList.add('active');
     if(element) element.classList.add('active');
     
-    // Si entramos a Estadísticas, calculamos por defecto el mes actual
     if(viewId === 'estadisticas') {
         const hoy = new Date();
         const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0];
@@ -50,30 +49,21 @@ db.ref("configuracion").on("value", snapshot => {
         configSeguros = data.seguros || { "Particular": 0 }; 
         configPrecios = data.precios || { "GLU": 25, "HEMO": 60 };
         renderizarConfiguracion(); actualizarSelectSeguros();
-    } else {
-        db.ref("configuracion").set({ seguros: { "Particular": 0 }, precios: { "GLU": 25 } });
-    }
+    } else { db.ref("configuracion").set({ seguros: { "Particular": 0 }, precios: { "GLU": 25 } }); }
 });
 
 function guardarSeguro() {
-    const nombre = document.getElementById('conf-seguro-nombre').value.trim();
-    const desc = parseFloat(document.getElementById('conf-seguro-desc').value);
+    const nombre = document.getElementById('conf-seguro-nombre').value.trim(); const desc = parseFloat(document.getElementById('conf-seguro-desc').value);
     if (!nombre || isNaN(desc)) return alert("Llene los datos");
     db.ref(`configuracion/seguros/${nombre}`).set(desc);
-    document.getElementById('conf-seguro-nombre').value = ''; document.getElementById('conf-seguro-desc').value = '';
-    mostrarToast("Sistema", `Seguro guardado.`);
+    document.getElementById('conf-seguro-nombre').value = ''; document.getElementById('conf-seguro-desc').value = ''; mostrarToast("Sistema", `Seguro guardado.`);
 }
-function eliminarSeguro(nombre) {
-    if(nombre === "Particular") return alert("No borrable.");
-    if(confirm(`¿Borrar ${nombre}?`)) db.ref(`configuracion/seguros/${nombre}`).remove();
-}
+function eliminarSeguro(nombre) { if(nombre === "Particular") return alert("No borrable."); if(confirm(`¿Borrar ${nombre}?`)) db.ref(`configuracion/seguros/${nombre}`).remove(); }
 function guardarPrueba() {
-    const id = document.getElementById('conf-prueba-id').value.trim().toUpperCase();
-    const precio = parseFloat(document.getElementById('conf-prueba-precio').value);
+    const id = document.getElementById('conf-prueba-id').value.trim().toUpperCase(); const precio = parseFloat(document.getElementById('conf-prueba-precio').value);
     if (!id || isNaN(precio)) return alert("Llene los datos");
     db.ref(`configuracion/precios/${id}`).set(precio);
-    document.getElementById('conf-prueba-id').value = ''; document.getElementById('conf-prueba-precio').value = '';
-    mostrarToast("Sistema", `Precio actualizado.`);
+    document.getElementById('conf-prueba-id').value = ''; document.getElementById('conf-prueba-precio').value = ''; mostrarToast("Sistema", `Precio actualizado.`);
 }
 function eliminarPrueba(id) { if(confirm(`¿Borrar ${id}?`)) db.ref(`configuracion/precios/${id}`).remove(); }
 
@@ -83,13 +73,12 @@ function renderizarConfiguracion() {
     const tablaP = document.getElementById('tabla-conf-pruebas'); tablaP.innerHTML = "";
     Object.keys(configPrecios).forEach(id => { tablaP.innerHTML += `<tr><td><strong>${id}</strong></td><td>${configPrecios[id]} Bs</td><td><button onclick="eliminarPrueba('${id}')" style="color:red; background:none; border:none; cursor:pointer;">🗑️</button></td></tr>`; });
 }
-
 function actualizarSelectSeguros() {
     const select = document.getElementById('seguro-paciente'); select.innerHTML = "";
     Object.keys(configSeguros).forEach(nombre => { select.innerHTML += `<option value="${nombre}">${nombre} (${configSeguros[nombre]}% Desc.)</option>`; });
 }
 
-// === CATÁLOGO COMPLETO Y ADMISIÓN ===
+// === CATÁLOGO Y ADMISIÓN ===
 let pruebasSeleccionadas = new Set(); let preciosModificados = {}; 
 const catalogoPruebas = {
     quimica: [ { id: "GLU", nombre: "Glucosa" }, { id: "UREA", nombre: "Urea" }, { id: "BUN", nombre: "Nitrógeno Ureico" }, { id: "CREA", nombre: "Creatinina" }, { id: "URI", nombre: "Ácido Úrico" }, { id: "COL", nombre: "Colesterol Total" }, { id: "TRIG", nombre: "Triglicéridos" }, { id: "HDL", nombre: "Colesterol HDL" }, { id: "LDL", nombre: "Colesterol LDL" }, { id: "VLDL", nombre: "Colesterol VLDL" }, { id: "LIPA", nombre: "Lipoproteína (a)" }, { id: "APOA1", nombre: "Apolipoproteína A1" }, { id: "APOB", nombre: "Apolipoproteína B" }, { id: "AST", nombre: "AST / GOT" }, { id: "ALT", nombre: "ALT / GPT" }, { id: "ALP", nombre: "Fosfatasa Alcalina" }, { id: "GGT", nombre: "Gamma GT" }, { id: "LDH", nombre: "Lactato Deshidrogenasa" }, { id: "BT", nombre: "Bilirrubina Total" }, { id: "BD", nombre: "Bilirrubina Directa" }, { id: "BI", nombre: "Bilirrubina Indirecta" }, { id: "PT", nombre: "Proteínas Totales" }, { id: "ALB", nombre: "Albúmina" }, { id: "GLOB", nombre: "Globulinas" }, { id: "CA", nombre: "Calcio Total" }, { id: "CAI", nombre: "Calcio Iónico" }, { id: "P", nombre: "Fósforo" }, { id: "MG", nombre: "Magnesio" }, { id: "FE", nombre: "Hierro Sanguíneo" }, { id: "TIBC", nombre: "Capacidad Fijación Fe" }, { id: "NA", nombre: "Sodio (Na+)" }, { id: "K", nombre: "Potasio (K+)" }, { id: "CL", nombre: "Cloro (Cl-)" }, { id: "AMIL", nombre: "Amilasa" }, { id: "LIP", nombre: "Lipasa" }, { id: "HBA1C", nombre: "Hemoglobina A1c" }, { id: "PCR", nombre: "Proteína C Reactiva" }, { id: "ASO", nombre: "Antiestreptolisina O" }, { id: "FR", nombre: "Factor Reumatoide" }, { id: "C3", nombre: "Complemento C3" }, { id: "C4", nombre: "Complemento C4" }, { id: "IGA", nombre: "Inmunoglobulina A" }, { id: "IGG", nombre: "Inmunoglobulina G" }, { id: "IGM", nombre: "Inmunoglobulina M" }, { id: "DIG", nombre: "Digoxina" }, { id: "VAL", nombre: "Ácido Valproico" }, { id: "FEN", nombre: "Fenitoína" }, { id: "CBZ", nombre: "Carbamazepina" } ],
@@ -125,15 +114,13 @@ function editarPrecioManual(idPrueba) {
     let nuevoPrecio = prompt(`✏️ Editar precio para ${idPrueba} (Bs):`, precioActual);
     if(nuevoPrecio !== null && !isNaN(nuevoPrecio)) { preciosModificados[idPrueba] = parseFloat(nuevoPrecio); actualizarCotizacion(); }
 }
-
 function actualizarCotizacion() {
     const panel = document.getElementById('panel-cotizacion'); const lista = document.getElementById('lista-precios');
     if(pruebasSeleccionadas.size === 0) { panel.style.display = "none"; return; }
     panel.style.display = "block"; lista.innerHTML = ""; let subtotal = 0;
     pruebasSeleccionadas.forEach(id => {
         let precio = preciosModificados[id] !== undefined ? preciosModificados[id] : (configPrecios[id] || 50);
-        subtotal += precio;
-        lista.innerHTML += `<tr><td><strong>${id}</strong></td><td>${precio.toFixed(2)}</td><td><button class="btn-edit-price" onclick="editarPrecioManual('${id}')">✏️</button></td></tr>`;
+        subtotal += precio; lista.innerHTML += `<tr><td><strong>${id}</strong></td><td>${precio.toFixed(2)}</td><td><button class="btn-edit-price" onclick="editarPrecioManual('${id}')">✏️</button></td></tr>`;
     });
     const desc = (configSeguros[document.getElementById('seguro-paciente').value] || 0) / 100;
     const descMonto = subtotal * desc; const total = subtotal - descMonto;
@@ -159,9 +146,7 @@ function buscarHistorial(ci) {
     });
 }
 
-window.copiarIDMuestra = function(id) {
-    navigator.clipboard.writeText(id).then(() => { mostrarToast("Copiado al Portapapeles", `El ID ${id} está copiado.`); }).catch(err => alert("Error: " + err));
-};
+window.copiarIDMuestra = function(id) { navigator.clipboard.writeText(id).then(() => { mostrarToast("Copiado al Portapapeles", `El ID ${id} está copiado.`); }).catch(err => alert("Error: " + err)); };
 
 function generarOrden() {
     const ci = document.getElementById('ci').value.trim(); const nombre = document.getElementById('nombre').value.trim();
@@ -177,12 +162,7 @@ function generarOrden() {
         id_muestra: idMuestra, ci_paciente: ci, nombre_paciente: nombre, medico: document.getElementById('medico').value.trim(),
         examenes: examenesArray, seguro: seguroSelect, total_cobrado: document.getElementById('lbl-total').innerText, estado: "Pendiente", fecha_creacion: new Date().toISOString()
     }).then(() => {
-        document.getElementById('lbl-paciente-etiqueta').innerHTML = `
-            ${nombre} | CI: ${ci}<br>Seguro: ${seguroSelect} | Total: ${document.getElementById('lbl-total').innerText}<br>
-            Exámenes: ${examenesArray.join(", ")}<br><br>
-            <span style="font-size: 1.1rem; color: var(--aes-dark);">ID de Tubo: <strong>${idMuestra}</strong></span>
-            <button onclick="copiarIDMuestra('${idMuestra}')" style="background:none; border:none; cursor:pointer; font-size:1.4rem; color:var(--aes-blue); margin-left: 5px; vertical-align: middle;" title="Copiar ID">📋</button>
-        `;
+        document.getElementById('lbl-paciente-etiqueta').innerHTML = `${nombre} | CI: ${ci}<br>Seguro: ${seguroSelect} | Total: ${document.getElementById('lbl-total').innerText}<br>Exámenes: ${examenesArray.join(", ")}<br><br><span style="font-size: 1.1rem; color: var(--aes-dark);">ID de Tubo: <strong>${idMuestra}</strong></span><button onclick="copiarIDMuestra('${idMuestra}')" style="background:none; border:none; cursor:pointer; font-size:1.4rem; color:var(--aes-blue); margin-left: 5px; vertical-align: middle;" title="Copiar ID">📋</button>`;
         document.getElementById('barcode-panel').style.display = "block";
         JsBarcode("#barcode", idMuestra, { format: "CODE128", width: 2, height: 50, displayValue: true, fontSize: 16, fontOptions: "bold" });
         pruebasSeleccionadas.clear(); preciosModificados = {}; actualizarCotizacion(); document.getElementById('medico').value = ""; buscarHistorial(ci);
@@ -224,17 +204,13 @@ db.ref("resultados").on("value", snapshot => {
         }
         keysAnteriores = new Set(Object.keys(datosGlobales)); primeraCarga = false;
         renderizarBandeja(); 
-        
-        // Si estamos en la pestaña de estadísticas, actualizar en vivo
         if(document.getElementById('view-estadisticas').classList.contains('active')) { calcularEstadisticas(); }
     } else { datosGlobales = {}; renderizarBandeja(); }
 });
 
 function agregarNotificacion(key, nombre, tubo) {
-    unreadCount++;
-    notificacionesPendientes.unshift({ key: key, nombre: nombre, tubo: tubo, leido: false });
-    actualizarCampanaUI();
-    mostrarToast("Nuevos Resultados", `${nombre} (Tubo: ${tubo})`);
+    unreadCount++; notificacionesPendientes.unshift({ key: key, nombre: nombre, tubo: tubo, leido: false });
+    actualizarCampanaUI(); mostrarToast("Nuevos Resultados", `${nombre} (Tubo: ${tubo})`);
 }
 
 function actualizarCampanaUI() {
@@ -258,11 +234,9 @@ window.abrirDesdeNotificacion = function(key) {
 }
 
 function mostrarToast(titulo, desc) {
-    const container = document.getElementById('toast-container');
-    const toast = document.createElement('div'); toast.className = 'toast';
+    const container = document.getElementById('toast-container'); const toast = document.createElement('div'); toast.className = 'toast';
     toast.innerHTML = `<div style="font-size: 1.8rem;">🔔</div><div><div style="font-weight: 800; color: var(--aes-dark);">${titulo}</div><div style="color: var(--aes-blue); font-size: 0.85rem; font-weight: bold; margin-top:2px;">${desc}</div></div>`;
-    container.appendChild(toast);
-    setTimeout(() => { toast.classList.add('fade-out'); setTimeout(() => toast.remove(), 500); }, 5000);
+    container.appendChild(toast); setTimeout(() => { toast.classList.add('fade-out'); setTimeout(() => toast.remove(), 500); }, 5000);
 }
 
 function cambiarFiltroBandeja(nuevoFiltro) {
@@ -284,7 +258,6 @@ function renderizarBandeja() {
             let nombreReal = r.paciente; let esHuerfano = true;
             if (ordenesGlobales[r.muestra]) { nombreReal = ordenesGlobales[r.muestra].nombre_paciente; esHuerfano = false; } 
             else if (r.paciente && r.paciente !== "Paciente Desconocido") { nombreReal = r.paciente; }
-
             const pacienteName = esHuerfano ? "⚠️ Sin Orden" : nombreReal;
             const estiloNombre = esHuerfano ? "color: #DC2626; font-style: italic;" : "";
             const badgeHuerfano = esHuerfano ? `<span style="background: #FEE2E2; color: #DC2626; padding: 3px 6px; border-radius: 4px; font-size: 0.65rem; font-weight: 800; margin-bottom: 5px; display: inline-block;">⚠️ CREADO EN EQUIPO</span>` : "";
@@ -313,26 +286,16 @@ function mostrarDetalle(key) {
     else { document.getElementById('botones-pendientes').style.display = "flex"; document.getElementById('botones-validados').style.display = "none"; document.getElementById('badge-estado-visor').innerText = "Pendiente Firma"; }
 
     let nombreReal = r.paciente; let esHuerfano = true; let parametrosPedidos = "No registrados";
-    if (ordenesGlobales[r.muestra]) {
-        nombreReal = ordenesGlobales[r.muestra].nombre_paciente;
-        parametrosPedidos = ordenesGlobales[r.muestra].examenes ? ordenesGlobales[r.muestra].examenes.join(", ") : "";
-        esHuerfano = false;
-    }
-
+    if (ordenesGlobales[r.muestra]) { nombreReal = ordenesGlobales[r.muestra].nombre_paciente; parametrosPedidos = ordenesGlobales[r.muestra].examenes ? ordenesGlobales[r.muestra].examenes.join(", ") : ""; esHuerfano = false; }
     document.getElementById("detalle-nombre").innerText = esHuerfano ? "Paciente de Urgencia (Equipo)" : nombreReal;
-    document.getElementById("detalle-muestra").innerText = r.muestra || "N/A";
-    document.getElementById("detalle-equipo").innerText = r.equipo || "Analizador LIS";
-    document.getElementById("pdf-paciente").innerText = esHuerfano ? "Paciente No Registrado" : nombreReal;
-    document.getElementById("pdf-orden").innerText = r.muestra || "N/A";
-    document.getElementById("pdf-equipo").innerText = r.equipo || "N/A";
+    document.getElementById("detalle-muestra").innerText = r.muestra || "N/A"; document.getElementById("detalle-equipo").innerText = r.equipo || "Analizador LIS";
+    document.getElementById("pdf-paciente").innerText = esHuerfano ? "Paciente No Registrado" : nombreReal; document.getElementById("pdf-orden").innerText = r.muestra || "N/A"; document.getElementById("pdf-equipo").innerText = r.equipo || "N/A";
     document.getElementById("pdf-fecha").innerText = r.fecha_validacion ? new Date(r.fecha_validacion).toLocaleString() : new Date().toLocaleString();
 
     const tablaLIS = document.getElementById("tabla-analitos"); const contPDF = document.getElementById("pdf-resultados-dinamicos");
     tablaLIS.innerHTML = ""; contPDF.innerHTML = "";
 
-    if(!esHuerfano) {
-        tablaLIS.insertAdjacentHTML('beforeend', `<tr><td colspan="3" style="background: #FFFBEB; padding: 10px; color: #B45309; font-size: 0.8rem;"><strong>Pruebas Solicitadas en Web:</strong> ${parametrosPedidos}</td></tr>`);
-    }
+    if(!esHuerfano) tablaLIS.insertAdjacentHTML('beforeend', `<tr><td colspan="3" style="background: #FFFBEB; padding: 10px; color: #B45309; font-size: 0.8rem;"><strong>Pruebas Solicitadas en Web:</strong> ${parametrosPedidos}</td></tr>`);
 
     const resRaw = r.resultados_totales || r.resultados || r.resultaos || "";
     if(resRaw !== "") {
@@ -342,9 +305,7 @@ function mostrarDetalle(key) {
             const p = linea.split(':'); const n = p[0].trim(); let valU = p.slice(1).join(':').trim(); 
             let vNum = valU; let uStr = ""; const sep = valU.indexOf(' ');
             if(sep > -1) { vNum = valU.substring(0, sep).trim(); uStr = valU.substring(sep).trim(); }
-            const info = obtenerInfoPrueba(n);
-            if(!arr[info.cat]) arr[info.cat] = [];
-            arr[info.cat].push({ n: n, v: vNum, u: uStr, ref: info.ref });
+            const info = obtenerInfoPrueba(n); if(!arr[info.cat]) arr[info.cat] = []; arr[info.cat].push({ n: n, v: vNum, u: uStr, ref: info.ref });
         });
 
         Object.keys(arr).forEach(cat => {
@@ -364,48 +325,47 @@ function descargarSoloPDF(forzarValidacion = false) {
     const pw = document.getElementById('pdf-container'); const ep = document.getElementById('plantilla-pdf');
     pw.style.display = 'block'; pw.style.position = 'absolute'; pw.style.zIndex = '-100';
     const opt = { margin: 10, filename: `Informe_AES_${document.getElementById('pdf-paciente').innerText.replace(/\s+/g, '_')}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }, pagebreak: { mode: ['avoid-all', 'css', 'legacy'] } };
-    html2pdf().set(opt).from(ep).save().then(() => {
-        pw.style.display = 'none'; btn.innerHTML = tOriginal;
-        if(forzarValidacion) db.ref("resultados/" + pacienteSeleccionadoId).update({ estado: "Validado_Final", fecha_validacion: new Date().toISOString() }).then(() => cambiarFiltroBandeja('Validados'));
-    });
+    html2pdf().set(opt).from(ep).save().then(() => { pw.style.display = 'none'; btn.innerHTML = tOriginal; if(forzarValidacion) db.ref("resultados/" + pacienteSeleccionadoId).update({ estado: "Validado_Final", fecha_validacion: new Date().toISOString() }).then(() => cambiarFiltroBandeja('Validados')); });
 }
-
 function validarYGenerarPDF() { if(pacienteSeleccionadoId && confirm("¿Liberar reporte médico?")) descargarSoloPDF(true); }
 function revertirValidacion() { if(pacienteSeleccionadoId && confirm("¿Regresar a Pendientes?")) db.ref("resultados/" + pacienteSeleccionadoId).update({ estado: "Pendiente Validacion" }).then(() => cambiarFiltroBandeja('Pendientes')); }
 function rechazarMuestra() { if(pacienteSeleccionadoId && confirm("¿RECHAZAR y ELIMINAR?")) db.ref("resultados/" + pacienteSeleccionadoId).remove().then(() => cambiarFiltroBandeja('Pendientes')); }
 function borrarRegistroLIS(event, key) { event.stopPropagation(); if(confirm("¿ELIMINAR permanentemente?")) db.ref("resultados/" + key).remove(); }
 
-// === MÓDULO DE ESTADÍSTICAS ===
+
+// === MÓDULO DE ESTADÍSTICAS Y DRILL-DOWN (PROFUNDIZACIÓN) ===
+
+window.filtrarTablaParametros = function() {
+    const filtro = document.getElementById('buscador-parametros').value.toUpperCase();
+    const filas = document.querySelectorAll('#tabla-estadisticas tr');
+    filas.forEach(fila => {
+        if(fila.cells.length < 2) return; // Saltamos la fila de "No hay datos"
+        const parametro = fila.cells[0].innerText.toUpperCase();
+        fila.style.display = parametro.includes(filtro) ? '' : 'none';
+    });
+};
+
 window.calcularEstadisticas = function() {
     const fechaIniStr = document.getElementById('filtro-fecha-inicio').value;
     const fechaFinStr = document.getElementById('filtro-fecha-fin').value;
-    
     if(!fechaIniStr || !fechaFinStr) return alert("Seleccione el rango de fechas");
 
-    // Convertir a formato YYMMDD (el que usan tus tubos) para filtrar inteligentemente
     const fInicio = new Date(fechaIniStr + "T00:00:00");
     const fFin = new Date(fechaFinStr + "T23:59:59");
-
-    let totalTubos = 0;
-    let conteoPruebas = {};
+    let totalTubos = 0; let conteoPruebas = {};
 
     Object.keys(datosGlobales).forEach(key => {
         const registro = datosGlobales[key];
-        const muestraID = registro.muestra || ""; // Ej: 2610195543
+        const muestraID = registro.muestra || ""; 
         
-        // Extraemos la fecha del ID de la muestra si tiene longitud 10 (YYMMDDxxxx)
         let fechaMuestra = null;
         if(muestraID.length >= 6) {
-            const yy = "20" + muestraID.substring(0, 2);
-            const mm = muestraID.substring(2, 4);
-            const dd = muestraID.substring(4, 6);
+            const yy = "20" + muestraID.substring(0, 2); const mm = muestraID.substring(2, 4); const dd = muestraID.substring(4, 6);
             fechaMuestra = new Date(`${yy}-${mm}-${dd}T12:00:00`);
         }
 
-        // Validamos si entra en el rango de fechas
         if(fechaMuestra && fechaMuestra >= fInicio && fechaMuestra <= fFin) {
             totalTubos++;
-            
             const resRaw = registro.resultados_totales || registro.resultados || registro.resultaos || "";
             if(resRaw !== "") {
                 resRaw.split('~').forEach(linea => {
@@ -419,9 +379,7 @@ window.calcularEstadisticas = function() {
     });
 
     document.getElementById('stat-total-tubos').innerText = totalTubos;
-
-    const tabla = document.getElementById('tabla-estadisticas');
-    tabla.innerHTML = "";
+    const tabla = document.getElementById('tabla-estadisticas'); tabla.innerHTML = "";
 
     if (Object.keys(conteoPruebas).length === 0) {
         document.getElementById('stat-top-prueba').innerText = "---";
@@ -429,17 +387,161 @@ window.calcularEstadisticas = function() {
         return;
     }
 
-    // Ordenar pruebas de mayor a menor consumo
     const pruebasOrdenadas = Object.entries(conteoPruebas).sort((a, b) => b[1] - a[1]);
-    
-    document.getElementById('stat-top-prueba').innerText = pruebasOrdenadas[0][0]; // El nombre de la prueba más solicitada
+    document.getElementById('stat-top-prueba').innerText = pruebasOrdenadas[0][0];
 
     pruebasOrdenadas.forEach(([prueba, cantidad]) => {
+        // AQUÍ INYECTAMOS EL BOTÓN CON LA LUPA PARA HACER DRILL-DOWN
         tabla.innerHTML += `
             <tr>
                 <td><strong>${prueba}</strong></td>
-                <td><span style="background: #E0F2FE; color: var(--aes-blue); font-weight: bold; padding: 5px 12px; border-radius: 20px;">${cantidad} Test(s)</span></td>
+                <td>
+                    <button onclick="verDetallePrueba('${prueba}')" style="cursor:pointer; background: #E0F2FE; color: var(--aes-blue); font-weight: bold; padding: 5px 12px; border-radius: 20px; border: 1px solid var(--aes-blue); transition: 0.2s;">
+                        ${cantidad} Test(s) 🔍
+                    </button>
+                </td>
             </tr>
         `;
     });
+};
+
+// === VARIABLES PARA LA VENTANA MODAL GIGANTE ===
+let datosPruebaActual = [];
+let datosFiltradosModal = [];
+let paginaActual = 1;
+let itemsPorPagina = 30;
+
+window.verDetallePrueba = function(pruebaId) {
+    document.getElementById('modal-detalle-titulo').innerText = `Detalle de Pacientes - Parámetro: ${pruebaId}`;
+    
+    // Limpiamos los filtros del modal antes de abrir
+    document.getElementById('filtro-modal-paciente').value = "";
+    document.getElementById('filtro-modal-fecha').value = "";
+    
+    datosPruebaActual = [];
+    
+    const fechaIniStr = document.getElementById('filtro-fecha-inicio').value;
+    const fechaFinStr = document.getElementById('filtro-fecha-fin').value;
+    const fInicio = new Date(fechaIniStr + "T00:00:00");
+    const fFin = new Date(fechaFinStr + "T23:59:59");
+
+    // Recolectamos a todos los pacientes que se hicieron ESTA prueba en ESTA fecha
+    Object.keys(datosGlobales).forEach(key => {
+        const registro = datosGlobales[key];
+        const muestraID = registro.muestra || ""; 
+        
+        let fechaMuestra = null;
+        if(muestraID.length >= 6) {
+            const yy = "20" + muestraID.substring(0, 2); const mm = muestraID.substring(2, 4); const dd = muestraID.substring(4, 6);
+            fechaMuestra = new Date(`${yy}-${mm}-${dd}T12:00:00`);
+        }
+
+        if(fechaMuestra && fechaMuestra >= fInicio && fechaMuestra <= fFin) {
+            const resRaw = registro.resultados_totales || registro.resultados || registro.resultaos || "";
+            if(resRaw !== "") {
+                let valorPrueba = null;
+                // Buscamos si el string de resultados tiene el parámetro exacto
+                resRaw.split('~').forEach(linea => {
+                    if(linea.trim() === "") return; 
+                    const p = linea.split(':'); const nombreParam = p[0].trim();
+                    if(nombreParam.toUpperCase() === pruebaId.toUpperCase()) {
+                        valorPrueba = p.slice(1).join(':').trim(); // Sacamos el número y la unidad (Ej: 95 mg/dL)
+                    }
+                });
+
+                if(valorPrueba !== null) {
+                    // Si lo encontró, cruzamos el nombre con las órdenes igual que en la bandeja
+                    let nombreReal = registro.paciente;
+                    if (ordenesGlobales[registro.muestra]) { nombreReal = ordenesGlobales[registro.muestra].nombre_paciente; } 
+                    else if (!nombreReal || nombreReal === "Paciente Desconocido") { nombreReal = "⚠️ Sin Orden Web"; }
+
+                    datosPruebaActual.push({
+                        fecha: fechaMuestra.toLocaleDateString(),
+                        tubo: registro.muestra || "N/A",
+                        paciente: nombreReal,
+                        valor: valorPrueba,
+                        estado: registro.estado === "Validado_Final" ? "✔ Validado" : "Pendiente"
+                    });
+                }
+            }
+        }
+    });
+
+    document.getElementById('modal-detalle-prueba').style.display = 'flex';
+    aplicarFiltrosModal(); // Esto renderiza la primera página
+};
+
+window.cerrarModalDetalle = function() {
+    document.getElementById('modal-detalle-prueba').style.display = 'none';
+};
+
+window.aplicarFiltrosModal = function() {
+    const filtroTexto = document.getElementById('filtro-modal-paciente').value.toUpperCase();
+    const filtroFecha = document.getElementById('filtro-modal-fecha').value; // Formato YYYY-MM-DD
+    
+    let fechaBuscadaFormat = "";
+    if(filtroFecha) {
+        // Convertimos el input de fecha (Ej: 2026-10-19) al formato de la tabla (19/10/2026 o similar, dependiendo del locale)
+        const d = new Date(filtroFecha + "T12:00:00");
+        fechaBuscadaFormat = d.toLocaleDateString();
+    }
+
+    datosFiltradosModal = datosPruebaActual.filter(item => {
+        const coincideTexto = item.paciente.toUpperCase().includes(filtroTexto) || item.tubo.includes(filtroTexto);
+        const coincideFecha = filtroFecha === "" || item.fecha === fechaBuscadaFormat;
+        return coincideTexto && coincideFecha;
+    });
+
+    paginaActual = 1;
+    renderizarPaginacion();
+};
+
+window.cambiarItemsPorPagina = function() {
+    itemsPorPagina = parseInt(document.getElementById('select-paginacion').value);
+    paginaActual = 1;
+    renderizarPaginacion();
+};
+
+window.cambiarPagina = function(direccion) {
+    paginaActual += direccion;
+    renderizarPaginacion();
+};
+
+window.renderizarPaginacion = function() {
+    const totalPaginas = Math.ceil(datosFiltradosModal.length / itemsPorPagina) || 1;
+    
+    // Asegurarnos de que no nos pasemos de página
+    if (paginaActual < 1) paginaActual = 1;
+    if (paginaActual > totalPaginas) paginaActual = totalPaginas;
+
+    // Calcular el slice de datos
+    const inicio = (paginaActual - 1) * itemsPorPagina;
+    const fin = inicio + itemsPorPagina;
+    const datosPagina = datosFiltradosModal.slice(inicio, fin);
+
+    // Renderizar la tabla del modal
+    const tabla = document.getElementById('tabla-modal-detalle');
+    tabla.innerHTML = "";
+
+    if (datosPagina.length === 0) {
+        tabla.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 20px; color: #888;">No se encontraron pacientes para este parámetro.</td></tr>`;
+    } else {
+        datosPagina.forEach(item => {
+            const colorEstado = item.estado.includes("Validado") ? "color: var(--success);" : "color: var(--warning);";
+            tabla.innerHTML += `
+                <tr>
+                    <td>${item.fecha}</td>
+                    <td><strong>${item.tubo}</strong></td>
+                    <td>${item.paciente}</td>
+                    <td style="font-family: monospace; font-weight: bold; font-size: 1.05rem;">${item.valor}</td>
+                    <td style="${colorEstado} font-weight: bold;">${item.estado}</td>
+                </tr>
+            `;
+        });
+    }
+
+    // Actualizar botones y etiquetas de paginación
+    document.getElementById('lbl-pagina-actual').innerText = `Pág ${paginaActual} de ${totalPaginas}`;
+    document.getElementById('btn-prev-page').disabled = (paginaActual === 1);
+    document.getElementById('btn-next-page').disabled = (paginaActual === totalPaginas);
 };
