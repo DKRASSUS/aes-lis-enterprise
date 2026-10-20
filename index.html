@@ -5,183 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AES O.S. Enterprise - LIS Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-    
-    <!-- Librerías Externas -->
+    <link rel="stylesheet" href="css/estilos.css">
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    
-    <style>
-        :root {
-            --aes-blue: #00A8E8;
-            --aes-dark: #1A1A24;
-            --aes-purple: #6B21A8;
-            --aes-accent: #C2E778;
-            --bg-color: #F4F7F6;
-            --card-bg: #FFFFFF;
-            --text-main: #333333;
-            --border-color: #E2E8F0;
-            --success: #10B981;
-            --danger: #EF4444;
-            --warning: #F59E0B;
-        }
-
-        body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); margin: 0; padding: 0; color: var(--text-main); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-        
-        /* TOPBAR UNIFICADA */
-        .topbar { background-color: var(--aes-dark); color: white; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); z-index: 20; }
-        .topbar h2 { margin: 0; font-size: 1.3rem; font-weight: 800; letter-spacing: 0.5px; display: flex; align-items: center; gap: 10px; }
-        .topbar h2 span { color: var(--aes-blue); }
-        .clock-status { display: flex; align-items: center; gap: 15px; }
-
-        /* LAYOUT PRINCIPAL CON MENÚ LATERAL */
-        .app-layout { display: flex; flex: 1; overflow: hidden; }
-        
-        .side-nav { width: 260px; background: white; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; padding-top: 20px; z-index: 10; }
-        .nav-item { padding: 18px 25px; font-weight: 700; color: #64748B; cursor: pointer; transition: 0.2s; border-left: 4px solid transparent; display: flex; align-items: center; gap: 12px; }
-        .nav-item:hover { background: #F8FAFC; color: var(--aes-dark); }
-        .nav-item.active { background: #E0F2FE; color: var(--aes-blue); border-left-color: var(--aes-blue); }
-
-        .main-content { flex: 1; overflow-y: auto; padding: 30px; position: relative; }
-        .view-section { display: none; animation: fadeIn 0.3s ease; }
-        .view-section.active { display: block; }
-
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-
-        /* ESTILOS COMUNES DE PANELES */
-        .panel { background: var(--card-bg); border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); padding: 25px; margin-bottom: 20px; }
-        .panel-blue { border-top: 4px solid var(--aes-blue); }
-        .panel-title { font-size: 1.1rem; font-weight: 800; margin-top: 0; margin-bottom: 20px; color: var(--aes-dark); text-transform: uppercase; border-bottom: 2px solid var(--border-color); padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center;}
-
-        /* ================= VISTA 1: ADMISIÓN ================= */
-        .admision-grid { display: grid; grid-template-columns: 1fr 1.2fr; gap: 20px; max-width: 1450px; margin: 0 auto; }
-        .form-group { margin-bottom: 15px; }
-        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        label { display: block; font-size: 0.8rem; font-weight: 600; color: #555; margin-bottom: 5px; text-transform: uppercase; }
-        input, select { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 4px; font-family: 'Inter', sans-serif; box-sizing: border-box; }
-        input:focus, select:focus { outline: none; border-color: var(--aes-blue); }
-        .search-box { display: flex; gap: 10px; }
-        .btn-search { background-color: var(--aes-blue); color: white; border: none; padding: 10px 20px; border-radius: 4px; font-weight: 600; cursor: pointer; transition: 0.2s; }
-        .btn-search:hover { background-color: #0089bd; }
-        
-        .history-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-        .history-table th, .history-table td { padding: 8px; border-bottom: 1px solid var(--border-color); text-align: left; }
-        .history-table th { background: #F1F5F9; color: #555; }
-
-        .category-btn { width: 100%; background-color: #F8FAFC; color: var(--aes-dark); border: 2px solid var(--border-color); padding: 15px; font-size: 1rem; text-align: left; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.2s;}
-        .category-btn:hover { border-color: var(--aes-purple); background-color: #F3E8FF; color: var(--aes-purple); }
-        
-        /* ESTILOS DE COTIZADOR */
-        .quote-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85rem; }
-        .quote-table th { background: #F1F5F9; padding: 8px; text-align: left; color: #555; }
-        .quote-table td { padding: 8px; border-bottom: 1px solid var(--border-color); }
-        .btn-edit-price { background: transparent; border: none; cursor: pointer; color: var(--aes-blue); font-size: 1rem; padding: 0 5px; }
-        .quote-summary { background: #F8FAFC; padding: 15px; border-radius: 6px; margin-top: 15px; text-align: right; border: 1px solid var(--border-color); }
-        .summary-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-weight: 600; color: #555; }
-        .summary-total { display: flex; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 2px solid var(--border-color); font-size: 1.2rem; font-weight: 800; color: var(--aes-dark); }
-        
-        .btn-success-adm { background-color: #10B981; color: white; width: 100%; padding: 15px; font-size: 1.1rem; border-radius: 8px; font-weight: 800; cursor: pointer; border: none; margin-top: 20px; }
-        .btn-success-adm:hover { background-color: #059669; }
-        .btn-print { background-color: #3B82F6; color: white; border: none; margin-top: 15px; width: 100%; font-size: 1rem; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: bold;}
-
-        /* Modal Pruebas Admisión */
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background: white; width: 95%; max-width: 1100px; max-height: 85vh; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
-        .modal-header { padding: 20px; background: var(--aes-dark); color: white; display: flex; justify-content: space-between; align-items: center; }
-        .btn-close { background: transparent; border: none; color: white; font-size: 1.5rem; cursor: pointer; }
-        .modal-body { padding: 20px; overflow-y: auto; background: #F8FAFC; }
-        .test-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
-        .test-card { background: white; border: 2px solid var(--border-color); border-radius: 8px; padding: 15px 10px; text-align: center; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 75px; user-select: none; }
-        .test-card .test-code { font-weight: 800; font-size: 1.1rem; color: var(--aes-dark); }
-        .test-card .test-name { font-size: 0.7rem; color: #666; margin-top: 5px; line-height: 1.2; }
-        .test-card.selected { background-color: var(--aes-purple); border-color: var(--aes-purple); box-shadow: 0 4px 10px rgba(107, 33, 168, 0.3); transform: translateY(-2px); }
-        .test-card.selected .test-code, .test-card.selected .test-name { color: white; }
-        .modal-footer { padding: 15px 20px; background: white; border-top: 1px solid var(--border-color); text-align: right; }
-        .btn-save-modal { background: var(--aes-purple); color: white; padding: 10px 20px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
-
-        .barcode-container { text-align: center; padding: 20px; background: #F8FAFC; border: 2px dashed #CBD5E1; border-radius: 8px; margin-top: 20px; display: none; }
-
-        /* ================= VISTA 2: VALIDACIÓN ================= */
-        .validacion-grid { display: grid; grid-template-columns: 350px 1fr; gap: 25px; max-width: 1450px; margin: 0 auto; height: calc(100vh - 120px); }
-        .inbox-panel { display: flex; flex-direction: column; padding: 0; overflow: hidden; border-top: 4px solid var(--aes-purple); height: 100%; }
-        .filter-controls { display: flex; background: #F8FAFC; border-bottom: 1px solid var(--border-color); }
-        .filter-btn { flex: 1; padding: 15px; border: none; background: transparent; font-weight: 700; color: #64748B; cursor: pointer; border-bottom: 3px solid transparent; }
-        .filter-btn.active { color: var(--aes-purple); border-bottom-color: var(--aes-purple); background: white; }
-        
-        .patient-list { overflow-y: auto; flex: 1; }
-        .patient-card-val { padding: 18px 20px; border-bottom: 1px solid var(--border-color); cursor: pointer; border-left: 4px solid transparent; background: white; transition: 0.2s;}
-        .patient-card-val:hover { background: #F8FAFC; padding-left: 25px; }
-        .patient-card-val.active { background: #F3E8FF; border-left-color: var(--aes-purple); }
-        .btn-delete-card { background: transparent; color: #EF4444; border: none; cursor: pointer; font-size: 1.1rem; padding: 6px; border-radius: 6px; transition: 0.2s; opacity: 0.4; }
-        .btn-delete-card:hover { background: #FEE2E2; opacity: 1; }
-        .status-pill { padding: 3px 8px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; }
-        .status-pill.pend { background: #FEF3C7; color: #D97706; }
-        .status-pill.val { background: #D1FAE5; color: #065F46; }
-
-        .review-area { display: flex; flex-direction: column; overflow-y: auto; padding-right: 10px;}
-        .empty-state { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #94A3B8; background: white; border-radius: 8px; border: 2px dashed var(--border-color); }
-        
-        .info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
-        .info-item label { display: block; font-size: 0.75rem; font-weight: 600; color: #888; text-transform: uppercase; margin-bottom: 4px; }
-        .info-item span { display: block; font-size: 1rem; font-weight: 700; color: var(--aes-dark); }
-        .sample-id-badge { font-family: monospace; background: #E2E8F0; padding: 4px 8px; border-radius: 4px; color: var(--aes-blue); letter-spacing: 1px; }
-
-        .results-table { width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; }
-        .results-table th { background: #F8FAFC; padding: 15px 20px; font-size: 0.8rem; text-transform: uppercase; color: #64748B; font-weight: 800; border-bottom: 2px solid var(--border-color); text-align: left; }
-        .results-table td { padding: 15px 20px; border-bottom: 1px solid var(--border-color); font-size: 0.95rem; font-weight: 600; background: white;}
-        .test-name { color: var(--aes-dark); display: flex; align-items: center; gap: 10px; }
-        .test-icon { width: 8px; height: 8px; background: var(--aes-blue); border-radius: 50%; display: inline-block; }
-        .test-value { font-family: monospace; font-size: 1.1rem; color: var(--aes-dark); }
-        .unit-badge { background: #F1F5F9; color: #475569; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; }
-
-        .action-panel { display: flex; justify-content: flex-end; gap: 15px; background: transparent; padding: 0; border: none; margin-top: 20px;}
-        button.action-btn { padding: 15px 25px; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; transition: 0.2s; font-size: 0.95rem; display: flex; align-items: center; gap: 8px; }
-        .btn-reject { background: white; border: 2px solid var(--danger); color: var(--danger); }
-        .btn-validate-pdf { background: var(--success); color: white; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.2); padding: 15px 25px; border-radius: 6px; border: none; font-weight: 700; cursor: pointer;}
-        .btn-validate-pdf:hover { background: #059669; transform: translateY(-2px); }
-        .btn-revert { background: white; border: 2px solid var(--warning); color: var(--warning); }
-        .btn-reprint { background: var(--aes-blue); color: white; }
-
-        /* PLANTILLA PDF */
-        #pdf-container { display: none; }
-        #plantilla-pdf { width: 100%; max-width: 740px; padding: 25px 30px; box-sizing: border-box; background: white; font-family: 'Inter', Helvetica, Arial, sans-serif; color: #333; margin: 0 auto; }
-        .pdf-header { display: flex; justify-content: space-between; border-bottom: 4px solid var(--aes-blue); padding-bottom: 15px; margin-bottom: 15px; }
-        .pdf-patient-box { background: #F8FAFC; border: 1px solid var(--border-color); border-radius: 6px; padding: 15px; margin-bottom: 20px; font-size: 12px; display: grid; grid-template-columns: 1fr 1fr; line-height: 1.6; }
-        .pdf-banda-color { background: var(--aes-blue); color: white; padding: 8px 15px; font-weight: bold; font-size: 13px; margin-top: 15px; margin-bottom: 0; text-transform: uppercase; }
-        .pdf-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 10px; }
-        .pdf-table th { text-align: left; padding: 8px 15px; border-bottom: 2px solid var(--border-color); color: #555; font-size: 10px; background: #F8FAFC; }
-        .pdf-table td { padding: 8px 15px; border-bottom: 1px solid #eee; }
-
-        /* NUEVO: ESTILOS DE NOTIFICACIONES (TOAST) */
-        #toast-container { position: fixed; bottom: 30px; right: 30px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
-        .toast { background: white; border-left: 4px solid var(--aes-blue); box-shadow: 0 10px 25px rgba(0,0,0,0.15); padding: 15px 20px; border-radius: 8px; display: flex; align-items: center; gap: 15px; animation: slideInRight 0.3s ease forwards; width: 300px; cursor: pointer; }
-        .toast.fade-out { animation: fadeOutRight 0.5s ease forwards; }
-        @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        @keyframes fadeOutRight { from { transform: translateX(0); opacity: 1; } to { transform: translateX(120%); opacity: 0; } }
-    </style>
 </head>
 <body>
 
-    <!-- CONTENEDOR DE NOTIFICACIONES TOAST -->
     <div id="toast-container"></div>
 
-    <!-- PANTALLA DE LOGIN -->
     <div id="login-screen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--aes-dark); display: flex; justify-content: center; align-items: center; z-index: 9999;">
         <div style="background: white; padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: center; width: 350px;">
             <h1 style="margin-top: 0; color: var(--aes-dark);">AES <span style="color: var(--aes-blue);">O.S.</span></h1>
-            <p style="color: #666; font-size: 0.9rem; margin-bottom: 30px;">Acceso restringido al personal autorizado</p>
-            
-            <div style="text-align: left; margin-bottom: 15px;">
-                <label style="font-size: 0.8rem; font-weight: bold; color: #555;">Correo Electrónico</label>
-                <input type="email" id="login-email" placeholder="usuario@aes.com" style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; margin-top: 5px;">
-            </div>
-            
-            <div style="text-align: left; margin-bottom: 25px;">
-                <label style="font-size: 0.8rem; font-weight: bold; color: #555;">Contraseña</label>
-                <input type="password" id="login-pass" placeholder="••••••••" style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; margin-top: 5px;">
-            </div>
-            
-            <button onclick="iniciarSesion()" style="width: 100%; background: var(--aes-blue); color: white; border: none; padding: 15px; border-radius: 6px; font-weight: bold; font-size: 1rem; cursor: pointer;">Ingresar al Sistema</button>
-            <p id="login-error" style="color: red; font-size: 0.8rem; margin-top: 15px; display: none;">Credenciales incorrectas.</p>
+            <p style="color: #666; font-size: 0.9rem; margin-bottom: 30px;">Acceso restringido</p>
+            <div style="text-align: left; margin-bottom: 15px;"><label style="font-size: 0.8rem; font-weight: bold; color: #555;">Correo</label><input type="email" id="login-email" style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; margin-top: 5px;"></div>
+            <div style="text-align: left; margin-bottom: 25px;"><label style="font-size: 0.8rem; font-weight: bold; color: #555;">Contraseña</label><input type="password" id="login-pass" style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; margin-top: 5px;"></div>
+            <button onclick="iniciarSesion()" style="width: 100%; background: var(--aes-blue); color: white; border: none; padding: 15px; border-radius: 6px; font-weight: bold; font-size: 1rem; cursor: pointer;">Ingresar</button>
+            <p id="login-error" style="color: red; font-size: 0.8rem; margin-top: 15px; display: none;">Error.</p>
         </div>
     </div>
     
@@ -190,16 +29,13 @@
         <div class="clock-status">
             <span id="reloj" style="font-weight: 600; color: #C2E778; font-size: 0.9rem;"></span>
             <div style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; background: rgba(255,255,255,0.1); padding: 5px 12px; border-radius: 20px;">
-                <span style="display: inline-block; width: 8px; height: 8px; background: var(--success); border-radius: 50%; box-shadow: 0 0 8px var(--success);"></span>
-                Sistema Online
-                <button onclick="cerrarSesion()" style="margin-left: 15px; background: transparent; border: 1px solid #EF4444; color: #EF4444; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: bold;">Salir</button>
+                <span style="display: inline-block; width: 8px; height: 8px; background: var(--success); border-radius: 50%;"></span> Sistema Online
+                <button onclick="cerrarSesion()" style="margin-left: 15px; background: transparent; border: 1px solid #EF4444; color: #EF4444; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-weight: bold;">Salir</button>
             </div>
         </div>
     </div>
 
     <div class="app-layout">
-        
-        <!-- MENÚ LATERAL -->
         <nav class="side-nav">
             <div class="nav-item active" onclick="switchView('admision', this)">🏥 Admisión y Órdenes</div>
             <div class="nav-item" onclick="switchView('validacion', this)">🔬 Validación Médica</div>
@@ -207,759 +43,121 @@
         </nav>
 
         <main class="main-content">
-            
-            <!-- VISTA 1: ADMISIÓN COMPLETA -->
+            <!-- VISTA 1: ADMISIÓN -->
             <div id="view-admision" class="view-section active">
                 <div class="admision-grid">
                     <div>
                         <div class="panel panel-blue">
                             <h3 class="panel-title">1. Registro Demográfico</h3>
-                            <div class="form-group">
-                                <label>Carnet de Identidad</label>
-                                <div class="search-box">
-                                    <input type="text" id="ci" placeholder="Ingrese CI para buscar o registrar">
-                                    <button class="btn-search" onclick="buscarPaciente()">🔍 Buscar LIS</button>
-                                </div>
-                            </div>
+                            <div class="form-group"><label>Carnet de Identidad</label><div class="search-box"><input type="text" id="ci"><button class="btn-search" onclick="buscarPaciente()">🔍 Buscar LIS</button></div></div>
                             <div class="form-group"><label>Nombre Completo</label><input type="text" id="nombre"></div>
-                            <div class="form-row">
-                                <div class="form-group"><label>Fecha de Nacimiento</label><input type="date" id="fecha_nac"></div>
-                                <div class="form-group"><label>Género</label>
-                                    <select id="genero"><option value="M">Masculino</option><option value="F">Femenino</option></select>
-                                </div>
-                            </div>
+                            <div class="form-row"><div class="form-group"><label>Nacimiento</label><input type="date" id="fecha_nac"></div><div class="form-group"><label>Género</label><select id="genero"><option value="M">Masculino</option><option value="F">Femenino</option></select></div></div>
                         </div>
-
-                        <div class="panel" id="panel-historial" style="display: none;">
-                            <h3 class="panel-title">Historial de Exámenes</h3>
-                            <table class="history-table">
-                                <thead><tr><th>Fecha</th><th>Médico</th><th>Pruebas</th><th>Estado</th></tr></thead>
-                                <tbody id="tabla-historial"></tbody>
-                            </table>
-                        </div>
+                        <div class="panel" id="panel-historial" style="display: none;"><h3 class="panel-title">Historial</h3><table class="history-table"><thead><tr><th>Fecha</th><th>Médico</th><th>Pruebas</th><th>Estado</th></tr></thead><tbody id="tabla-historial"></tbody></table></div>
                     </div>
-
                     <div>
                         <div class="panel">
                             <h3 class="panel-title">2. Orden y Facturación</h3>
-                            <div class="form-row">
-                                <div class="form-group"><label>Médico Solicitante</label><input type="text" id="medico"></div>
-                                <div class="form-group"><label>Prioridad</label>
-                                    <select id="prioridad"><option value="Rutina">Rutina</option><option value="Urgencia">Urgencia (STAT)</option></select>
-                                </div>
-                            </div>
-
-                            <div class="form-group" style="margin-top: 15px;">
-                                <label style="color: var(--aes-purple);">🛡️ Convenio / Seguro</label>
-                                <select id="seguro-paciente" onchange="actualizarCotizacion()" style="border-color: var(--aes-purple); background: #F3E8FF; font-weight: bold;">
-                                    <option value="Particular">Privado / Particular (Sin Descuento)</option>
-                                    <option value="Nacional">Seguro Nacional Vida (20% Desc.)</option>
-                                    <option value="BISA">Seguro BISA (25% Desc.)</option>
-                                    <option value="CajaPetrolera">Caja Petrolera (100% Cubierto)</option>
-                                </select>
-                            </div>
-
-                            <label style="margin-top: 20px; margin-bottom: 10px;">Selección de Paneles (Click para abrir)</label>
-                            
+                            <div class="form-row"><div class="form-group"><label>Médico Solicitante</label><input type="text" id="medico"></div><div class="form-group"><label>Prioridad</label><select id="prioridad"><option value="Rutina">Rutina</option><option value="Urgencia">Urgencia (STAT)</option></select></div></div>
+                            <div class="form-group" style="margin-top: 15px;"><label style="color: var(--aes-purple);">🛡️ Convenio / Seguro</label><select id="seguro-paciente" onchange="actualizarCotizacion()" style="border-color: var(--aes-purple); background: #F3E8FF; font-weight: bold;"></select></div>
+                            <label style="margin-top: 20px; margin-bottom: 10px;">Selección de Paneles</label>
                             <button class="category-btn" onclick="abrirModal('quimica')">🧪 Química Sanguínea, TDM y Drogas <span>+</span></button>
                             <button class="category-btn" onclick="abrirModal('inmunologia')">🧬 Inmunología y Hormonas <span>+</span></button>
                             <button class="category-btn" onclick="abrirModal('infecciosas')">🦠 Serología e Infecciosas <span>+</span></button>
                             <button class="category-btn" onclick="abrirModal('marcadores')">🎗️ Marcadores Tumorales <span>+</span></button>
                             <button class="category-btn" onclick="abrirModal('hematologia')">🩸 Hematología <span>+</span></button>
                             <button class="category-btn" onclick="abrirModal('coagulacion')">⏱️ Coagulación y Factores <span>+</span></button>
-
                             <div id="panel-cotizacion" style="display: none;">
-                                <table class="quote-table">
-                                    <thead><tr><th>Prueba</th><th>Precio (Bs)</th><th>Editar</th></tr></thead>
-                                    <tbody id="lista-precios"></tbody>
-                                </table>
-                                
-                                <div class="quote-summary">
-                                    <div class="summary-row"><span>Subtotal:</span><span id="lbl-subtotal">0.00 Bs</span></div>
-                                    <div class="summary-row" style="color: var(--danger);"><span>Descuento Seguro:</span><span id="lbl-descuento">- 0.00 Bs</span></div>
-                                    <div class="summary-total"><span>TOTAL A COBRAR:</span><span id="lbl-total" style="color: var(--success);">0.00 Bs</span></div>
-                                </div>
+                                <table class="quote-table"><thead><tr><th>Prueba</th><th>Precio (Bs)</th><th>Editar</th></tr></thead><tbody id="lista-precios"></tbody></table>
+                                <div class="quote-summary"><div class="summary-row"><span>Subtotal:</span><span id="lbl-subtotal">0.00 Bs</span></div><div class="summary-row" style="color: var(--danger);"><span>Descuento Seguro:</span><span id="lbl-descuento">- 0.00 Bs</span></div><div class="summary-total"><span>TOTAL:</span><span id="lbl-total" style="color: var(--success);">0.00 Bs</span></div></div>
                             </div>
-
                             <button class="btn-success-adm" onclick="generarOrden()">💳 Generar Orden LIS</button>
                         </div>
-                        
-                        <div class="panel barcode-container" id="barcode-panel">
-                            <h3 class="panel-title" style="border: none; margin-bottom: 5px;">Etiqueta Generada</h3>
-                            <p style="font-size: 0.85rem; color: #555; margin-bottom: 15px;" id="lbl-paciente-etiqueta"></p>
-                            <svg id="barcode"></svg>
-                            <button class="btn-print" onclick="window.print()">🖨️ Imprimir Etiqueta para Tubo</button>
-                        </div>
+                        <div class="panel barcode-container" id="barcode-panel"><h3 class="panel-title" style="border: none; margin-bottom: 5px;">Etiqueta</h3><p style="font-size: 0.85rem; color: #555;" id="lbl-paciente-etiqueta"></p><svg id="barcode"></svg><button class="btn-print" onclick="window.print()">🖨️ Imprimir</button></div>
                     </div>
                 </div>
             </div>
 
-            <!-- VISTA 2: VALIDACIÓN MÉDICA -->
+            <!-- VISTA 2: VALIDACIÓN -->
             <div id="view-validacion" class="view-section">
                 <div class="validacion-grid">
-                    
                     <div class="panel inbox-panel">
-                        <div class="filter-controls">
-                            <button class="filter-btn active" id="btn-filtro-pendientes" onclick="cambiarFiltroBandeja('Pendientes')">📥 Pendientes</button>
-                            <button class="filter-btn" id="btn-filtro-validados" onclick="cambiarFiltroBandeja('Validados')">🗄️ Histórico</button>
-                        </div>
+                        <div class="filter-controls"><button class="filter-btn active" id="btn-filtro-pendientes" onclick="cambiarFiltroBandeja('Pendientes')">📥 Pendientes</button><button class="filter-btn" id="btn-filtro-validados" onclick="cambiarFiltroBandeja('Validados')">🗄️ Histórico</button></div>
                         <div class="patient-list" id="lista-pacientes"></div>
                     </div>
-
                     <div class="review-area">
-                        <div class="empty-state" id="estado-vacio">
-                            <h3 style="margin-bottom: 5px; color: var(--aes-dark);">Ningún reporte seleccionado</h3>
-                            <p style="margin-top: 0;">Seleccione un tubo de la bandeja lateral.</p>
-                        </div>
-
+                        <div class="empty-state" id="estado-vacio"><h3>Ningún reporte seleccionado</h3><p>Seleccione un tubo de la bandeja lateral.</p></div>
                         <div id="contenedor-resultados" style="display: none;">
-                            <div class="panel panel-blue" style="padding-bottom: 15px;">
-                                <div class="info-grid">
-                                    <div class="info-item"><label>Nombre Completo</label><span id="detalle-nombre">---</span></div>
-                                    <div class="info-item"><label>ID de Muestra (Tubo)</label><span class="sample-id-badge" id="detalle-muestra">---</span></div>
-                                    <div class="info-item"><label>Equipo Origen</label><span id="detalle-equipo">---</span></div>
-                                </div>
-                            </div>
-
+                            <div class="panel panel-blue" style="padding-bottom: 15px;"><div class="info-grid"><div class="info-item"><label>Nombre</label><span id="detalle-nombre">---</span></div><div class="info-item"><label>ID (Tubo)</label><span class="sample-id-badge" id="detalle-muestra">---</span></div><div class="info-item"><label>Equipo</label><span id="detalle-equipo">---</span></div></div></div>
                             <div class="panel" style="padding-top: 10px;">
-                                <h3 class="panel-title">Resultados Analíticos <span id="badge-estado-visor" style="background: #E0F2FE; color: var(--aes-blue); padding: 4px 12px; border-radius: 20px; font-size: 0.75rem;">Pendiente Firma</span></h3>
-
-                                <table class="results-table">
-                                    <thead><tr><th>Análisis Clínico</th><th>Valor Obtenido</th><th>Unidad</th></tr></thead>
-                                    <tbody id="tabla-analitos"></tbody>
-                                </table>
-
-                                <div class="action-panel" id="botones-pendientes">
-                                    <button class="action-btn btn-reject" onclick="rechazarMuestra()">✖ Rechazar</button>
-                                    <button class="action-btn btn-validate-pdf" onclick="validarYGenerarPDF()">✔ Validar y Generar Informe Estructurado</button>
-                                </div>
-
-                                <div class="action-panel" id="botones-validados" style="display: none;">
-                                    <button class="action-btn btn-revert" onclick="revertirValidacion()">↩ Revertir a Pendiente</button>
-                                    <button class="action-btn btn-reprint" onclick="descargarSoloPDF()">🖨️ Re-imprimir Informe Estructurado</button>
-                                </div>
+                                <h3 class="panel-title">Resultados <span id="badge-estado-visor" style="background: #E0F2FE; color: var(--aes-blue); padding: 4px 12px; border-radius: 20px; font-size: 0.75rem;">Pendiente</span></h3>
+                                <table class="results-table"><thead><tr><th>Análisis Clínico</th><th>Valor</th><th>Unidad</th></tr></thead><tbody id="tabla-analitos"></tbody></table>
+                                <div class="action-panel" id="botones-pendientes"><button class="action-btn btn-reject" onclick="rechazarMuestra()">✖ Rechazar</button><button class="action-btn btn-validate-pdf" onclick="validarYGenerarPDF()">✔ Validar e Imprimir</button></div>
+                                <div class="action-panel" id="botones-validados" style="display: none;"><button class="action-btn btn-revert" onclick="revertirValidacion()">↩ Revertir</button><button class="action-btn btn-reprint" onclick="descargarSoloPDF()">🖨️ Re-imprimir</button></div>
                             </div>
                         </div>
                     </div>
-
                 </div>
             </div>
 
             <!-- VISTA 3: CONFIGURACIÓN AUTÓNOMA -->
             <div id="view-configuracion" class="view-section">
-                <div class="panel panel-blue">
-                    <h3 class="panel-title">⚙️ Configuración Administrativa (Fase en desarrollo)</h3>
-                    <p style="color: #666; font-size: 0.95rem; line-height: 1.6;">
-                        Este módulo te permitirá operar el sistema de forma 100% autónoma. En la siguiente actualización, esta pantalla se conectará a tu base de datos de Firebase para que puedas:
-                        <ul style="color: #555;">
-                            <li>Crear, editar o eliminar Seguros e Instituciones y asignarles sus porcentajes de descuento.</li>
-                            <li>Modificar el catálogo maestro de Pruebas Clínicas, ajustando sus nombres y categorías.</li>
-                            <li>Actualizar los precios base y rangos de referencia de cada parámetro en tiempo real.</li>
-                        </ul>
-                        Ninguno de estos datos dependerá del código fuente nunca más.
-                    </p>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <!-- Panel de Seguros -->
+                    <div class="panel panel-blue">
+                        <h3 class="panel-title">🛡️ Gestión de Seguros y Descuentos</h3>
+                        <div class="form-row">
+                            <div class="form-group"><label>Nombre Institución/Seguro</label><input type="text" id="conf-seguro-nombre" placeholder="Ej: Seguro BISA"></div>
+                            <div class="form-group"><label>% Descuento (0 a 100)</label><input type="number" id="conf-seguro-desc" placeholder="Ej: 20"></div>
+                        </div>
+                        <button class="btn-success-adm" style="margin-top:0; padding: 10px;" onclick="guardarSeguro()">Guardar Seguro</button>
+                        
+                        <table class="history-table" style="margin-top: 20px;">
+                            <thead><tr><th>Seguro</th><th>Descuento</th><th>Acción</th></tr></thead>
+                            <tbody id="tabla-conf-seguros"></tbody>
+                        </table>
+                    </div>
+
+                    <!-- Panel de Pruebas -->
+                    <div class="panel panel-blue">
+                        <h3 class="panel-title">🧪 Catálogo de Pruebas y Precios Base</h3>
+                        <div class="form-row">
+                            <div class="form-group"><label>Abreviación (Ej: GLU)</label><input type="text" id="conf-prueba-id"></div>
+                            <div class="form-group"><label>Precio Base (Bs)</label><input type="number" id="conf-prueba-precio"></div>
+                        </div>
+                        <button class="btn-success-adm" style="margin-top:0; padding: 10px;" onclick="guardarPrueba()">Guardar Prueba / Actualizar Precio</button>
+                        
+                        <table class="history-table" style="margin-top: 20px;">
+                            <thead><tr><th>Prueba (ID)</th><th>Precio Base</th><th>Acción</th></tr></thead>
+                            <tbody id="tabla-conf-pruebas"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
         </main>
     </div>
 
-    <!-- MODAL DE PRUEBAS PARA ADMISIÓN -->
-    <div class="modal-overlay" id="modal-pruebas">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="modal-titulo">Seleccionar Pruebas</h3>
-                <button class="btn-close" onclick="cerrarModal()">×</button>
-            </div>
-            <div class="modal-body">
-                <div class="test-grid" id="modal-grid"></div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-save-modal" onclick="cerrarModal()">Confirmar Selección</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- PLANTILLA PDF -->
+    <!-- Modales y PDF -->
+    <div class="modal-overlay" id="modal-pruebas"><div class="modal-content"><div class="modal-header"><h3 id="modal-titulo">Pruebas</h3><button class="btn-close" onclick="cerrarModal()">×</button></div><div class="modal-body"><div class="test-grid" id="modal-grid"></div></div><div class="modal-footer"><button class="btn-save-modal" onclick="cerrarModal()">Confirmar</button></div></div></div>
+    
     <div id="pdf-container">
         <div id="plantilla-pdf">
             <div class="pdf-header">
-                <div>
-                    <h1 style="margin:0; color: #1A1A24; font-size: 28px;">AES <span style="color: #00A8E8;">O.S.</span></h1>
-                    <p style="margin:0; font-size: 13px; color: #666; font-weight: bold;">LABORATORIO CLÍNICO AUTOMATIZADO</p>
-                    <p style="margin:0; font-size: 11px; color: #888;">Santa Cruz de la Sierra, Bolivia</p>
-                </div>
-                <div style="text-align: right;">
-                    <h2 style="margin:0; color: #00A8E8; font-size: 22px;">INFORME DE RESULTADOS</h2>
-                    <p style="margin:0; font-size: 12px; font-weight: bold;" id="pdf-fecha"></p>
-                </div>
+                <div><h1 style="margin:0; color: #1A1A24; font-size: 28px;">AES <span style="color: #00A8E8;">O.S.</span></h1><p style="margin:0; font-size: 13px; color: #666; font-weight: bold;">LABORATORIO CLÍNICO</p></div>
+                <div style="text-align: right;"><h2 style="margin:0; color: #00A8E8; font-size: 22px;">INFORME DE RESULTADOS</h2><p style="margin:0; font-size: 12px; font-weight: bold;" id="pdf-fecha"></p></div>
             </div>
             <div class="pdf-patient-box">
-                <div>
-                    <strong>Paciente:</strong> <span id="pdf-paciente">---</span><br>
-                    <strong>Identificación (CI):</strong> ---<br>
-                    <strong>ID de Muestra / Orden:</strong> <span id="pdf-orden">---</span>
-                </div>
-                <div>
-                    <strong>Médico Solicitante:</strong> A.E.S. Portal Web<br>
-                    <strong>Equipo Procesador:</strong> <span id="pdf-equipo">---</span><br>
-                    <strong>Estado:</strong> RESULTADOS VALIDADOS
-                </div>
+                <div><strong>Paciente:</strong> <span id="pdf-paciente"></span><br><strong>ID de Muestra:</strong> <span id="pdf-orden"></span></div>
+                <div><strong>Equipo:</strong> <span id="pdf-equipo"></span><br><strong>Estado:</strong> VALIDADOS</div>
             </div>
             <div id="pdf-resultados-dinamicos"></div>
-            <div style="margin-top: 50px; border-top: 1px solid #ccc; padding-top: 10px;">
-                <p style="font-size: 11px; margin: 0;"><strong>Firma Electrónica:</strong> Validado por LIS Middleware</p>
-                <p style="font-size: 9px; color: #888; margin-top: 5px;">Este informe fue procesado de forma automatizada por AES O.S. Enterprise. Los rangos de referencia dependen del método y reactivo utilizado.</p>
-            </div>
         </div>
     </div>
 
-    <!-- FIREBASE SDK -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    
-    <script>
-        // === LLAVE CORRECTA DE FIREBASE ====
-        const firebaseConfig = {
-          apiKey: "AIzaSyBLuIk-gKICLWlLSdWNAsnVYPXxqvroijI",
-          authDomain: "lis-aes.firebaseapp.com",
-          databaseURL: "https://lis-aes-default-rtdb.firebaseio.com",
-          projectId: "lis-aes",
-          storageBucket: "lis-aes.firebasestorage.app",
-          messagingSenderId: "333107041449",
-          appId: "1:333107041449:web:e498022d3e04e876f9c5b8"
-        };
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
-        const auth = firebase.auth();
-
-        auth.onAuthStateChanged(user => {
-            if (user) document.getElementById('login-screen').style.display = 'none';
-            else document.getElementById('login-screen').style.display = 'flex';
-        });
-
-        function iniciarSesion() {
-            const email = document.getElementById('login-email').value;
-            const pass = document.getElementById('login-pass').value;
-            const errorMsg = document.getElementById('login-error');
-            errorMsg.style.display = 'none';
-            auth.signInWithEmailAndPassword(email, pass).catch(error => {
-                errorMsg.innerText = "Error: " + error.message;
-                errorMsg.style.display = 'block';
-            });
-        }
-        function cerrarSesion() { auth.signOut(); }
-
-        setInterval(() => { document.getElementById('reloj').innerText = new Date().toLocaleString(); }, 1000);
-
-        function switchView(viewId, element) {
-            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-            document.getElementById('view-' + viewId).classList.add('active');
-            element.classList.add('active');
-        }
-
-        // ==========================================
-        // CATÁLOGO COMPLETO RESTAURADO (FASE 1)
-        // ==========================================
-        const preciosBase = {
-            "GLU": 25, "UREA": 30, "BUN": 30, "CREA": 35, "URI": 35, "COL": 40, "TRIG": 40, "HDL": 40, "LDL": 40, "VLDL": 40, 
-            "LIPA": 45, "APOA1": 50, "APOB": 50, "AST": 30, "ALT": 30, "ALP": 35, "GGT": 35, "LDH": 40, "BT": 25, "BD": 25, 
-            "BI": 25, "PT": 30, "ALB": 30, "GLOB": 30, "CA": 35, "CAI": 35, "P": 30, "MG": 35, "FE": 40, "TIBC": 40, 
-            "NA": 35, "K": 35, "CL": 35, "AMIL": 35, "LIP": 40, "HBA1C": 60, "PCR": 40, "ASO": 40, "FR": 40, "C3": 45, 
-            "C4": 45, "IGA": 50, "IGG": 50, "IGM": 50, "DIG": 80, "VAL": 80, "FEN": 80, "CBZ": 80, "TSH": 120, "FT4": 120, 
-            "FT3": 120, "T4": 100, "T3": 100, "ATPO": 120, "ATG": 120, "TRAB": 150, "FSH": 100, "LH": 100, "PRL": 100, 
-            "E2": 120, "E3": 120, "PRG": 120, "TESTO": 120, "TESTL": 150, "SHBG": 120, "BHCG": 100, "AMH": 200, "CORT": 120, 
-            "ACTH": 150, "PTH": 150, "INS": 100, "CPEP": 120, "FERR": 100, "VITD": 150, "VITB12": 120, "FOL": 120, "TROP": 150, 
-            "PROBNP": 200, "CKMB": 100, "MYO": 120, "PCT": 200, "IGE": 100, "ANA": 150, "ADN": 150, "HBSAG": 80, "AHBS": 80, 
-            "AHBC": 80, "AHBCM": 90, "HBEAG": 80, "AHBE": 80, "HCV": 100, "HAVM": 90, "HIV": 100, "SYPH": 50, "CHAGAS": 60, 
-            "TOXOG": 80, "TOXOM": 80, "RUBG": 80, "RUBM": 80, "CMVG": 80, "CMVM": 80, "HSV1G": 80, "HSV2G": 80, "DENG": 90, 
-            "DENGM": 90, "EBVG": 90, "EBVM": 90, "HPI": 80, "COVG": 100, "COVAG": 100, "PSA": 150, "PSAL": 150, "CEA": 150, 
-            "CA125": 180, "CA153": 180, "CA199": 180, "AFP": 150, "B2M": 150, "HE4": 200, "CYFRA": 200, "NSE": 200, "SCC": 200, 
-            "HEMO": 60, "VSG": 20, "RET": 30, "GS": 30, "PLA": 25, "LEU": 25, "HGB": 20, "HCT": 20, "VCM": 20, "TP": 35, 
-            "INR": 35, "TTPA": 40, "FIB": 45, "TT": 40, "DDIM": 120, "VWFAG": 150, "VWFRC": 150, "FVIII": 150, "FIX": 150, 
-            "FVII": 150, "FV": 150, "FX": 150, "FXI": 150, "FXII": 150, "PC": 150, "PS": 150, "ATIII": 150, "LA1": 150, 
-            "AXA": 150, "PLAS": 150, "ACA": 150
-        };
-        
-        let preciosModificados = {}; 
-
-        const descuentosSeguro = {
-            "Particular": 0.00,
-            "Nacional": 0.20,
-            "BISA": 0.25,
-            "CajaPetrolera": 1.00
-        };
-
-        const catalogoPruebas = {
-            quimica: [
-                { id: "GLU", nombre: "Glucosa" }, { id: "UREA", nombre: "Urea" }, { id: "BUN", nombre: "Nitrógeno Ureico" },
-                { id: "CREA", nombre: "Creatinina" }, { id: "URI", nombre: "Ácido Úrico" }, { id: "COL", nombre: "Colesterol Total" },
-                { id: "TRIG", nombre: "Triglicéridos" }, { id: "HDL", nombre: "Colesterol HDL" }, { id: "LDL", nombre: "Colesterol LDL" },
-                { id: "VLDL", nombre: "Colesterol VLDL" }, { id: "LIPA", nombre: "Lipoproteína (a)" }, { id: "APOA1", nombre: "Apolipoproteína A1" },
-                { id: "APOB", nombre: "Apolipoproteína B" }, { id: "AST", nombre: "AST / GOT" }, { id: "ALT", nombre: "ALT / GPT" }, 
-                { id: "ALP", nombre: "Fosfatasa Alcalina" }, { id: "GGT", nombre: "Gamma GT" }, { id: "LDH", nombre: "Lactato Deshidrogenasa" }, 
-                { id: "BT", nombre: "Bilirrubina Total" }, { id: "BD", nombre: "Bilirrubina Directa" }, { id: "BI", nombre: "Bilirrubina Indirecta" },
-                { id: "PT", nombre: "Proteínas Totales" }, { id: "ALB", nombre: "Albúmina" }, { id: "GLOB", nombre: "Globulinas" },
-                { id: "CA", nombre: "Calcio Total" }, { id: "CAI", nombre: "Calcio Iónico" }, { id: "P", nombre: "Fósforo" }, 
-                { id: "MG", nombre: "Magnesio" }, { id: "FE", nombre: "Hierro Sanguíneo" }, { id: "TIBC", nombre: "Capacidad Fijación Fe" },
-                { id: "NA", nombre: "Sodio (Na+)" }, { id: "K", nombre: "Potasio (K+)" }, { id: "CL", nombre: "Cloro (Cl-)" },
-                { id: "AMIL", nombre: "Amilasa" }, { id: "LIP", nombre: "Lipasa" }, { id: "HBA1C", nombre: "Hemoglobina A1c" },
-                { id: "PCR", nombre: "Proteína C Reactiva" }, { id: "ASO", nombre: "Antiestreptolisina O" }, { id: "FR", nombre: "Factor Reumatoide" },
-                { id: "C3", nombre: "Complemento C3" }, { id: "C4", nombre: "Complemento C4" }, { id: "IGA", nombre: "Inmunoglobulina A" },
-                { id: "IGG", nombre: "Inmunoglobulina G" }, { id: "IGM", nombre: "Inmunoglobulina M" }, { id: "DIG", nombre: "Digoxina" },
-                { id: "VAL", nombre: "Ácido Valproico" }, { id: "FEN", nombre: "Fenitoína" }, { id: "CBZ", nombre: "Carbamazepina" }
-            ],
-            inmunologia: [
-                { id: "TSH", nombre: "Hormona TSH" }, { id: "FT4", nombre: "T4 Libre" }, { id: "FT3", nombre: "T3 Libre" },
-                { id: "T4", nombre: "T4 Total" }, { id: "T3", nombre: "T3 Total" }, { id: "ATPO", nombre: "Anti-TPO" },
-                { id: "ATG", nombre: "Anti-Tiroglobulina" }, { id: "TRAB", nombre: "Anti-Receptor TSH" }, { id: "FSH", nombre: "Hormona FSH" }, 
-                { id: "LH", nombre: "Hormona LH" }, { id: "PRL", nombre: "Prolactina" }, { id: "E2", nombre: "Estradiol" }, 
-                { id: "E3", nombre: "Estriol Libre" }, { id: "PRG", nombre: "Progesterona" }, { id: "TESTO", nombre: "Testosterona Total" }, 
-                { id: "TESTL", nombre: "Testosterona Libre" }, { id: "SHBG", nombre: "Globulina Fijadora Sex." }, { id: "BHCG", nombre: "Beta-hCG Cuantitativa" }, 
-                { id: "AMH", nombre: "Hormona Antimülleriana" }, { id: "CORT", nombre: "Cortisol (Sérico)" }, { id: "ACTH", nombre: "Hormona ACTH" }, 
-                { id: "PTH", nombre: "Paratohormona Intacta" }, { id: "INS", nombre: "Insulina" }, { id: "CPEP", nombre: "Péptido C" },
-                { id: "FERR", nombre: "Ferritina" }, { id: "VITD", nombre: "Vitamina D (25-OH)" }, { id: "VITB12", nombre: "Vitamina B12" },
-                { id: "FOL", nombre: "Ácido Fólico" }, { id: "TROP", nombre: "Troponina I Alta Sens." }, { id: "PROBNP", nombre: "NT-proBNP" },
-                { id: "CKMB", nombre: "CK-MB Masa" }, { id: "MYO", nombre: "Mioglobina" }, { id: "PCT", nombre: "Procalcitonina" },
-                { id: "IGE", nombre: "IgE Total" }, { id: "ANA", nombre: "Anticuerpos ANA" }, { id: "ADN", nombre: "Anti-DNA dc" }
-            ],
-            infecciosas: [
-                { id: "HBSAG", nombre: "Antígeno de Sup. Hep B" }, { id: "AHBS", nombre: "Ac. Anti-HBs" }, { id: "AHBC", nombre: "Ac. Anti-HBc Total" },
-                { id: "AHBCM", nombre: "Ac. Anti-HBc IgM" }, { id: "HBEAG", nombre: "Antígeno HBe" }, { id: "AHBE", nombre: "Ac. Anti-HBe" },
-                { id: "HCV", nombre: "Anticuerpos Hep C" }, { id: "HAVM", nombre: "Hep A IgM" }, { id: "HIV", nombre: "VIH Ag/Ab Combo" },
-                { id: "SYPH", nombre: "Sífilis (Treponema)" }, { id: "CHAGAS", nombre: "Chagas IgG/IgM" }, { id: "TOXOG", nombre: "Toxoplasma IgG" }, 
-                { id: "TOXOM", nombre: "Toxoplasma IgM" }, { id: "RUBG", nombre: "Rubéola IgG" }, { id: "RUBM", nombre: "Rubéola IgM" }, 
-                { id: "CMVG", nombre: "Citomegalovirus IgG" }, { id: "CMVM", nombre: "Citomegalovirus IgM" }, { id: "HSV1G", nombre: "Herpes I IgG" }, 
-                { id: "HSV2G", nombre: "Herpes II IgG" }, { id: "DENG", nombre: "Dengue NS1 Ag" }, { id: "DENGM", nombre: "Dengue IgM" },
-                { id: "EBVG", nombre: "Epstein-Barr VCA IgG" }, { id: "EBVM", nombre: "Epstein-Barr VCA IgM" }, { id: "HPI", nombre: "Helicobacter pylori IgG" },
-                { id: "COVG", nombre: "SARS-CoV-2 IgG" }, { id: "COVAG", nombre: "SARS-CoV-2 Antígeno" }
-            ],
-            marcadores: [
-                { id: "PSA", nombre: "PSA Total" }, { id: "PSAL", nombre: "PSA Libre" }, { id: "CEA", nombre: "Antígeno Carcinoembrionario" },
-                { id: "CA125", nombre: "CA 125 (Ovario)" }, { id: "CA153", nombre: "CA 15-3 (Mama)" }, { id: "CA199", nombre: "CA 19-9 (GI/Páncreas)" },
-                { id: "AFP", nombre: "Alfa-fetoproteína" }, { id: "B2M", nombre: "Beta-2 Microglobulina" }, { id: "HE4", nombre: "HE4 (Ovario)" },
-                { id: "CYFRA", nombre: "CYFRA 21-1 (Pulmón)" }, { id: "NSE", nombre: "Enolasa Específica" }, { id: "SCC", nombre: "Antígeno Células Esc." }
-            ],
-            hematologia: [
-                { id: "HEMO", nombre: "Hemograma Completo" }, { id: "VSG", nombre: "Velocidad de Sedimentación" }, { id: "RET", nombre: "Reticulocitos" },
-                { id: "GS", nombre: "Grupo y Factor Rh" }, { id: "PLA", nombre: "Recuento de Plaquetas" }, { id: "LEU", nombre: "Fórmula Leucocitaria" },
-                { id: "HGB", nombre: "Hemoglobina" }, { id: "HCT", nombre: "Hematocrito" }, { id: "VCM", nombre: "Índices Eritrocitarios" }
-            ],
-            coagulacion: [
-                { id: "TP", nombre: "Tiempo de Protrombina" }, { id: "INR", nombre: "INR" }, { id: "TTPA", nombre: "Tiempo de Tromboplastina (APTT)" }, 
-                { id: "FIB", nombre: "Fibrinógeno" }, { id: "TT", nombre: "Tiempo de Trombina" }, { id: "DDIM", nombre: "Dímero D" }, 
-                { id: "VWFAG", nombre: "von Willebrand (Ag)" }, { id: "VWFRC", nombre: "von Willebrand (RCo)" }, { id: "FVIII", nombre: "Factor VIII" },
-                { id: "FIX", nombre: "Factor IX" }, { id: "FVII", nombre: "Factor VII" }, { id: "FV", nombre: "Factor V" },
-                { id: "FX", nombre: "Factor X" }, { id: "FXI", nombre: "Factor XI" }, { id: "FXII", nombre: "Factor XII" },
-                { id: "PC", nombre: "Proteína C (Actividad)" }, { id: "PS", nombre: "Proteína S (Libre)" }, { id: "ATIII", nombre: "Antitrombina III" },
-                { id: "LA1", nombre: "Anticoagulante Lúpico" }, { id: "AXA", nombre: "Anti-Factor Xa" }, { id: "PLAS", nombre: "Plasminógeno" },
-                { id: "ACA", nombre: "Anticuerpos Anticardiolipina" }
-            ]
-        };
-
-        const nombresCategorias = { quimica: "🧪 Química Sanguínea, TDM y Drogas", inmunologia: "🧬 Inmunología y Hormonas", infecciosas: "🦠 Serología e Infecciosas", marcadores: "🎗️ Marcadores Tumorales", hematologia: "🩸 Hematología", coagulacion: "⏱️ Coagulación y Factores Especiales" };
-
-        let pruebasSeleccionadas = new Set();
-
-        function abrirModal(categoria) {
-            document.getElementById('modal-titulo').innerText = nombresCategorias[categoria];
-            const grid = document.getElementById('modal-grid');
-            grid.innerHTML = ""; 
-
-            catalogoPruebas[categoria].forEach(prueba => {
-                const isSelected = pruebasSeleccionadas.has(prueba.id);
-                const card = document.createElement('div');
-                card.className = `test-card ${isSelected ? 'selected' : ''}`;
-                card.onclick = () => togglePrueba(card, prueba.id);
-                card.innerHTML = `<div class="test-code">${prueba.id}</div><div class="test-name">${prueba.nombre}</div>`;
-                grid.appendChild(card);
-            });
-
-            document.getElementById('modal-pruebas').style.display = 'flex';
-        }
-
-        function togglePrueba(cardElement, idPrueba) {
-            if (pruebasSeleccionadas.has(idPrueba)) {
-                pruebasSeleccionadas.delete(idPrueba);
-                cardElement.classList.remove('selected');
-                delete preciosModificados[idPrueba];
-            } else {
-                pruebasSeleccionadas.add(idPrueba);
-                cardElement.classList.add('selected');
-            }
-        }
-
-        function cerrarModal() {
-            document.getElementById('modal-pruebas').style.display = 'none';
-            actualizarCotizacion();
-        }
-
-        function editarPrecioManual(idPrueba) {
-            let precioActual = preciosModificados[idPrueba] !== undefined ? preciosModificados[idPrueba] : (preciosBase[idPrueba] || 50);
-            let nuevoPrecio = prompt(`✏️ Editar precio para ${idPrueba} (Bs):`, precioActual);
-            if(nuevoPrecio !== null && !isNaN(nuevoPrecio)) {
-                preciosModificados[idPrueba] = parseFloat(nuevoPrecio);
-                actualizarCotizacion();
-            }
-        }
-
-        function actualizarCotizacion() {
-            const panel = document.getElementById('panel-cotizacion');
-            const lista = document.getElementById('lista-precios');
-            
-            if(pruebasSeleccionadas.size === 0) {
-                panel.style.display = "none";
-                return;
-            }
-            
-            panel.style.display = "block";
-            lista.innerHTML = "";
-            let subtotal = 0;
-
-            pruebasSeleccionadas.forEach(id => {
-                let precio = preciosModificados[id] !== undefined ? preciosModificados[id] : (preciosBase[id] || 50);
-                subtotal += precio;
-                
-                lista.innerHTML += `
-                    <tr>
-                        <td><strong>${id}</strong></td>
-                        <td>${precio.toFixed(2)}</td>
-                        <td><button class="btn-edit-price" onclick="editarPrecioManual('${id}')" title="Editar Precio Manualmente">✏️</button></td>
-                    </tr>
-                `;
-            });
-
-            const seguroSelect = document.getElementById('seguro-paciente').value;
-            const porcentajeDescuento = descuentosSeguro[seguroSelect];
-            const descuentoMonto = subtotal * porcentajeDescuento;
-            const total = subtotal - descuentoMonto;
-
-            document.getElementById('lbl-subtotal').innerText = `${subtotal.toFixed(2)} Bs`;
-            document.getElementById('lbl-descuento').innerText = `- ${descuentoMonto.toFixed(2)} Bs`;
-            document.getElementById('lbl-total').innerText = `${total.toFixed(2)} Bs`;
-        }
-
-        function actualizarResumenSeleccion() {
-            const contenedor = document.getElementById('resumen-seleccion');
-            contenedor.innerHTML = "";
-            pruebasSeleccionadas.forEach(id => { contenedor.innerHTML += `<span class="badge-prueba">${id} ✖</span>`; });
-        }
-
-        function buscarPaciente() {
-            const ci = document.getElementById('ci').value.trim();
-            if(!ci) { alert("Ingrese un CI."); return; }
-
-            db.ref("pacientes/" + ci).once("value").then((snapshot) => {
-                if (snapshot.exists()) {
-                    const datos = snapshot.val();
-                    document.getElementById('nombre').value = datos.nombre;
-                    document.getElementById('fecha_nac').value = datos.fecha_nac;
-                    document.getElementById('genero').value = datos.genero;
-                    buscarHistorial(ci);
-                } else {
-                    alert("Paciente nuevo. Complete los datos.");
-                    document.getElementById('nombre').value = "";
-                    document.getElementById('panel-historial').style.display = "none";
-                }
-            });
-        }
-
-        function buscarHistorial(ci) {
-            const tabla = document.getElementById('tabla-historial');
-            tabla.innerHTML = ""; 
-            db.ref("ordenes_pendientes").orderByChild("ci_paciente").equalTo(ci).once("value", (snapshot) => {
-                if(snapshot.exists()) {
-                    document.getElementById('panel-historial').style.display = "block";
-                    snapshot.forEach((hijo) => {
-                        const orden = hijo.val();
-                        const fecha = new Date(orden.fecha_creacion).toLocaleDateString();
-                        const pruebas = orden.examenes ? orden.examenes.join(", ") : "N/A";
-                        const fila = `<tr><td>${fecha}</td><td>${orden.medico || 'N/A'}</td><td><strong>${pruebas}</strong></td><td><span style="color: var(--aes-blue); font-weight: bold;">${orden.estado}</span></td></tr>`;
-                        tabla.insertAdjacentHTML("afterbegin", fila);
-                    });
-                }
-            });
-        }
-
-        function generarOrden() {
-            const ci = document.getElementById('ci').value.trim();
-            const nombre = document.getElementById('nombre').value.trim();
-            const medico = document.getElementById('medico').value.trim();
-            
-            if(!ci || !nombre) { alert("El CI y el Nombre son obligatorios."); return; }
-            if(pruebasSeleccionadas.size === 0) { alert("Debe seleccionar al menos un examen de los paneles."); return; }
-
-            const datosPaciente = { nombre: nombre, fecha_nac: document.getElementById('fecha_nac').value, genero: document.getElementById('genero').value, ultima_visita: new Date().toISOString() };
-            db.ref("pacientes/" + ci).set(datosPaciente);
-
-            const examenesArray = Array.from(pruebasSeleccionadas);
-            const fechaHoy = new Date().toISOString().slice(2,10).replace(/-/g,"");
-            const random = Math.floor(1000 + Math.random() * 9000);
-            const idMuestra = `${fechaHoy}${random}`;
-            
-            const seguroSelect = document.getElementById('seguro-paciente').options[document.getElementById('seguro-paciente').selectedIndex].text;
-            const totalCobrado = document.getElementById('lbl-total').innerText;
-
-            const datosOrden = {
-                id_muestra: idMuestra, ci_paciente: ci, nombre_paciente: nombre, medico: medico,
-                examenes: examenesArray, prioridad: document.getElementById('prioridad').value,
-                seguro: seguroSelect, total_cobrado: totalCobrado,
-                estado: "Pendiente", fecha_creacion: new Date().toISOString()
-            };
-
-            db.ref("ordenes_pendientes/" + idMuestra).set(datosOrden).then(() => {
-                document.getElementById('lbl-paciente-etiqueta').innerText = `${nombre} | CI: ${ci}\nSeguro: ${seguroSelect} | Total: ${totalCobrado}\nExámenes: ${examenesArray.join(", ")}`;
-                document.getElementById('barcode-panel').style.display = "block";
-                
-                JsBarcode("#barcode", idMuestra, { format: "CODE128", lineColor: "#000000", width: 2, height: 50, displayValue: true, fontSize: 16, fontOptions: "bold" });
-
-                pruebasSeleccionadas.clear();
-                preciosModificados = {};
-                actualizarCotizacion();
-                document.getElementById('medico').value = "";
-                buscarHistorial(ci);
-            });
-        }
-
-        // ==========================================
-        // DICCIONARIOS DE VALIDACIÓN COMPLETOS
-        // ==========================================
-        let datosGlobales = {}; 
-        let pacienteSeleccionadoId = null;
-        let filtroActual = "Pendientes";
-
-        const diccionarioLIS = {
-            "QUÍMICA SANGUÍNEA Y ENZIMAS": ["GLU", "UREA", "BUN", "CREA", "URI", "COL", "TRIG", "HDL", "LDL", "VLDL", "AST", "ALT", "ALP", "GGT", "LDH", "BT", "BD", "BI", "PT", "ALB", "CA", "P", "MG", "FE", "NA", "K", "CL", "AMIL", "LIP"],
-            "INMUNOLOGÍA Y HORMONAS": ["TSH", "FT4", "FT3", "T4", "T3", "FSH", "LH", "PRL", "E2", "PRG", "TESTO", "BHCG", "INS", "CORT", "FERR", "VITD", "VITB12", "FOL"],
-            "SEROLOGÍA E INFECCIOSAS": ["HBSAG", "HCV", "HIV", "SYPH", "CHAGAS", "TOXOG", "TOXOM", "DENG"],
-            "MARCADORES TUMORALES": ["PSA", "CEA", "CA125", "CA153", "CA199", "AFP"],
-            "HEMATOLOGÍA Y COAGULACIÓN": ["HEMO", "VSG", "RET", "TP", "INR", "TTPA", "FIB", "DDIM"]
-        };
-
-        const referenciasMOCK = {
-            "GLU": "70.0 - 110.0", "COL": "< 200.0", "TRIG": "< 150.0", "CREA": "0.6 - 1.2", "URI": "3.4 - 7.0",
-            "UREA": "15.0 - 45.0", "AST": "< 40.0", "ALT": "< 41.0", "TSH": "0.4 - 4.0", "FT4": "0.9 - 1.7", 
-            "HEMO": "4.5 - 10.0", "PSA": "< 4.0", "VITD": "30.0 - 100.0", "FERR": "30.0 - 400.0"
-        };
-
-        function obtenerInfoPrueba(prueba) {
-            let categoriaEncontrada = "OTROS EXÁMENES DE LABORATORIO";
-            for (const [cat, lista] of Object.entries(diccionarioLIS)) {
-                if (lista.includes(prueba.toUpperCase())) { categoriaEncontrada = cat; break; }
-            }
-            return { cat: categoriaEncontrada, ref: referenciasMOCK[prueba.toUpperCase()] || "Referencia según método/inserto" };
-        }
-
-        // ==========================================
-        // NUEVO: SISTEMA DE NOTIFICACIONES Y HUÉRFANOS
-        // ==========================================
-        let keysAnteriores = new Set();
-        let primeraCarga = true;
-
-        db.ref("resultados").on("value", (snapshot) => {
-            if (snapshot.exists()) { 
-                datosGlobales = snapshot.val(); 
-                
-                // Disparar "Acuse de Recibo" para los nuevos registros
-                if (!primeraCarga) {
-                    const keysActuales = Object.keys(datosGlobales);
-                    keysActuales.forEach(key => {
-                        if (!keysAnteriores.has(key)) {
-                            const reg = datosGlobales[key];
-                            const nombreNotif = (reg.paciente && reg.paciente !== "Paciente Desconocido") ? reg.paciente : "Paciente No Registrado";
-                            mostrarNotificacion(nombreNotif, reg.muestra || "N/A");
-                        }
-                    });
-                }
-                
-                keysAnteriores = new Set(Object.keys(datosGlobales));
-                primeraCarga = false;
-
-                renderizarBandeja(); 
-            } else {
-                datosGlobales = {};
-                renderizarBandeja();
-            }
-        });
-
-        function mostrarNotificacion(nombre, tubo) {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = 'toast';
-            toast.innerHTML = `
-                <div style="font-size: 1.8rem;">🔔</div>
-                <div>
-                    <div style="font-weight: 800; color: var(--aes-dark); font-size: 0.95rem;">¡Nuevos Resultados!</div>
-                    <div style="color: #666; font-size: 0.8rem; margin-top: 3px;">Tubo <strong>${tubo}</strong></div>
-                    <div style="color: var(--aes-blue); font-size: 0.85rem; font-weight: bold; margin-top: 2px;">${nombre}</div>
-                </div>
-            `;
-            container.appendChild(toast);
-            
-            setTimeout(() => {
-                toast.classList.add('fade-out');
-                setTimeout(() => toast.remove(), 500);
-            }, 5000);
-        }
-
-        function cambiarFiltroBandeja(nuevoFiltro) {
-            filtroActual = nuevoFiltro;
-            document.getElementById('btn-filtro-pendientes').classList.remove('active');
-            document.getElementById('btn-filtro-validados').classList.remove('active');
-            document.getElementById(filtroActual === "Pendientes" ? 'btn-filtro-pendientes' : 'btn-filtro-validados').classList.add('active');
-
-            document.getElementById("estado-vacio").style.display = "flex";
-            document.getElementById("contenedor-resultados").style.display = "none";
-            pacienteSeleccionadoId = null;
-            renderizarBandeja();
-        }
-
-        function renderizarBandeja() {
-            const lista = document.getElementById("lista-pacientes");
-            lista.innerHTML = "";
-            let keysMostradas = 0;
-            const keys = Object.keys(datosGlobales).reverse();
-            
-            keys.forEach(key => {
-                const registro = datosGlobales[key];
-                const estaValidado = (registro.estado === "Validado_Final");
-
-                if ((filtroActual === "Pendientes" && !estaValidado) || (filtroActual === "Validados" && estaValidado)) {
-                    keysMostradas++;
-                    
-                    // LÓGICA DE PACIENTES HUÉRFANOS (URGENCIAS DE EQUIPO)
-                    const esHuerfano = (!registro.paciente || registro.paciente === "Paciente Desconocido");
-                    const pacienteName = esHuerfano ? "⚠️ Creado en Analizador" : registro.paciente;
-                    const estiloNombre = esHuerfano ? "color: #DC2626; font-style: italic;" : "";
-                    const badgeHuerfano = esHuerfano ? `<span style="background: #FEE2E2; color: #DC2626; padding: 3px 6px; border-radius: 4px; font-size: 0.65rem; font-weight: 800; margin-bottom: 5px; display: inline-block;">⚠️ SIN ORDEN WEB</span>` : "";
-
-                    const idMuestra = registro.muestra || "N/A";
-                    const claseActiva = (pacienteSeleccionadoId === key) ? "active" : "";
-                    const clasePill = estaValidado ? "val" : "pend";
-                    const textoPill = estaValidado ? "✔ Validado" : "Pendiente";
-
-                    lista.insertAdjacentHTML('beforeend', `
-                         <div class="patient-card-val ${claseActiva}" id="card-${key}" style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
-                             <div style="flex: 1;" onclick="mostrarDetalle('${key}')">
-                                 ${badgeHuerfano}
-                                 <div class="patient-name" style="${estiloNombre}">${pacienteName}</div>
-                                 <div class="patient-meta">
-                                    <span>Tubo: <strong>${idMuestra}</strong></span>
-                                    <span class="status-pill ${clasePill}">${textoPill}</span>
-                                </div>
-                             </div>
-                             <button class="btn-delete-card" onclick="borrarRegistroLIS(event, '${key}')" title="Eliminar este paciente">🗑️</button>
-                         </div>`);
-                }
-            });
-
-            if (keysMostradas === 0) lista.innerHTML = `<div style="padding: 30px; text-align: center; color: #888;">No hay informes aquí.</div>`;
-        }
-
-        function mostrarDetalle(key) {
-            pacienteSeleccionadoId = key;
-            const registro = datosGlobales[key];
-            const estaValidado = (registro.estado === "Validado_Final");
-            const esHuerfano = (!registro.paciente || registro.paciente === "Paciente Desconocido");
-            
-            document.querySelectorAll('.patient-card-val').forEach(el => el.classList.remove('active'));
-            document.getElementById(`card-${key}`).classList.add('active');
-            document.getElementById("estado-vacio").style.display = "none";
-            document.getElementById("contenedor-resultados").style.display = "block";
-
-            if(estaValidado) {
-                document.getElementById('botones-pendientes').style.display = "none";
-                document.getElementById('botones-validados').style.display = "flex";
-                document.getElementById('badge-estado-visor').innerText = "✔ ARCHIVADO";
-            } else {
-                document.getElementById('botones-pendientes').style.display = "flex";
-                document.getElementById('botones-validados').style.display = "none";
-                document.getElementById('badge-estado-visor').innerText = "Pendiente Firma";
-            }
-
-            document.getElementById("detalle-nombre").innerText = esHuerfano ? "Paciente de Urgencia (Equipo)" : registro.paciente;
-            document.getElementById("detalle-muestra").innerText = registro.muestra || "N/A";
-            document.getElementById("detalle-equipo").innerText = registro.equipo || "Analizador LIS";
-
-            document.getElementById("pdf-paciente").innerText = esHuerfano ? "Paciente No Registrado" : registro.paciente;
-            document.getElementById("pdf-orden").innerText = registro.muestra || "N/A";
-            document.getElementById("pdf-equipo").innerText = registro.equipo || "N/A";
-            document.getElementById("pdf-fecha").innerText = registro.fecha_validacion ? new Date(registro.fecha_validacion).toLocaleString() : new Date().toLocaleString();
-
-            const tablaLIS = document.getElementById("tabla-analitos");
-            const contPDF = document.getElementById("pdf-resultados-dinamicos");
-            tablaLIS.innerHTML = ""; contPDF.innerHTML = "";
-
-            const resultadosBrutos = registro.resultados_totales || registro.resultados || registro.resultaos || "";
-
-            if(resultadosBrutos !== "") {
-                const lineasAnalitos = resultadosBrutos.split('~');
-                let resultadosAgrupados = {};
-                
-                lineasAnalitos.forEach(linea => {
-                    if(linea.trim() === "") return; 
-                    const partes = linea.split(':');
-                    const nombrePrueba = partes[0].trim();
-                    let valorUnidad = partes.slice(1).join(':').trim(); 
-                    
-                    let valorNum = valorUnidad;
-                    let unidadStr = "";
-                    const sep = valorUnidad.indexOf(' ');
-                    if(sep > -1) { valorNum = valorUnidad.substring(0, sep).trim(); unidadStr = valorUnidad.substring(sep).trim(); }
-
-                    const infoPrueba = obtenerInfoPrueba(nombrePrueba);
-                    if(!resultadosAgrupados[infoPrueba.cat]) resultadosAgrupados[infoPrueba.cat] = [];
-                    resultadosAgrupados[infoPrueba.cat].push({ nombre: nombrePrueba, valor: valorNum, unidad: unidadStr, ref: infoPrueba.ref });
-                });
-
-                Object.keys(resultadosAgrupados).forEach(categoria => {
-                    tablaLIS.insertAdjacentHTML('beforeend', `
-                        <tr style="background: #F3E8FF;"><td colspan="3" style="padding: 10px 20px; font-weight: 800; color: var(--aes-purple); font-size: 0.85rem; text-transform: uppercase;">🏷️ ${categoria}</td></tr>
-                    `);
-
-                    let htmlSeccion = `<div class="pdf-banda-color">${categoria}</div><table class="pdf-table"><thead><tr><th style="width: 30%;">EXAMEN</th><th style="width: 20%;">RESULTADO</th><th style="width: 20%;">UNIDAD</th><th style="width: 30%;">RANGO DE REFERENCIA</th></tr></thead><tbody>`;
-
-                    resultadosAgrupados[categoria].forEach(res => {
-                        tablaLIS.insertAdjacentHTML('beforeend', `<tr><td class="test-name" style="padding-left: 35px;">${res.nombre}</td><td class="test-value">${res.valor}</td><td><span class="unit-badge">${res.unidad || '-'}</span></td></tr>`);
-                        htmlSeccion += `<tr><td style="font-weight: bold;">${res.nombre}</td><td style="font-family: monospace; font-size: 13px; font-weight: bold;">${res.valor}</td><td style="color: #666;">${res.unidad || '-'}</td><td style="color: #888; font-size: 11px;">${res.ref}</td></tr>`;
-                    });
-
-                    htmlSeccion += `</tbody></table>`;
-                    contPDF.insertAdjacentHTML('beforeend', htmlSeccion);
-                });
-
-            } else {
-                tablaLIS.innerHTML = `<tr><td colspan="3" style="text-align: center; padding: 20px;">Sin resultados</td></tr>`;
-                contPDF.innerHTML = `<p>No hay resultados analíticos disponibles.</p>`;
-            }
-        }
-
-        function descargarSoloPDF(forzarValidacion = false) {
-            const btn = document.querySelector(forzarValidacion ? '.btn-validate-pdf' : '.btn-reprint');
-            const textoOriginal = btn.innerHTML;
-            btn.innerHTML = "⏳ Generando Informe...";
-
-            const pdfWrapper = document.getElementById('pdf-container');
-            const elementoPlantilla = document.getElementById('plantilla-pdf');
-            
-            pdfWrapper.style.display = 'block'; pdfWrapper.style.position = 'absolute'; pdfWrapper.style.zIndex = '-100';
-
-            const opt = { margin: 10, filename: `Informe_AES_${document.getElementById('pdf-paciente').innerText.replace(/\s+/g, '_')}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }, pagebreak: { mode: ['avoid-all', 'css', 'legacy'] } };
-
-            html2pdf().set(opt).from(elementoPlantilla).save().then(() => {
-                pdfWrapper.style.display = 'none'; btn.innerHTML = textoOriginal;
-                if(forzarValidacion) {
-                    db.ref("resultados/" + pacienteSeleccionadoId).update({ estado: "Validado_Final", fecha_validacion: new Date().toISOString() }).then(() => { alert(`Informe descargado y archivado.`); });
-                }
-            });
-        }
-
-        function validarYGenerarPDF() { if(pacienteSeleccionadoId && confirm("¿Liberar reporte médico?")) descargarSoloPDF(true); }
-        function revertirValidacion() { if(pacienteSeleccionadoId && confirm("¿Regresar a Pendientes?")) db.ref("resultados/" + pacienteSeleccionadoId).update({ estado: "Pendiente Validacion" }).then(() => { document.getElementById("estado-vacio").style.display = "flex"; document.getElementById("contenedor-resultados").style.display = "none"; pacienteSeleccionadoId = null; }); }
-        function rechazarMuestra() { if(pacienteSeleccionadoId && confirm("¿RECHAZAR y ELIMINAR?")) db.ref("resultados/" + pacienteSeleccionadoId).remove().then(() => { document.getElementById("estado-vacio").style.display = "flex"; document.getElementById("contenedor-resultados").style.display = "none"; pacienteSeleccionadoId = null; }); }
-        function borrarRegistroLIS(event, key) { event.stopPropagation(); if(confirm("¿ELIMINAR registro permanentemente?")) db.ref("resultados/" + key).remove().then(() => { if(pacienteSeleccionadoId === key) { document.getElementById("estado-vacio").style.display = "flex"; document.getElementById("contenedor-resultados").style.display = "none"; pacienteSeleccionadoId = null; } }); }
-    </script>
+    <script src="js/app.js"></script>
 </body>
 </html>
