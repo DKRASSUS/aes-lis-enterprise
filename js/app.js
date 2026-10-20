@@ -295,6 +295,7 @@ function revertirValidacion() { if(pacienteSeleccionadoId && confirm("¿Regresar
 function rechazarMuestra() { if(pacienteSeleccionadoId && confirm("¿RECHAZAR y ELIMINAR?")) db.ref("resultados/" + pacienteSeleccionadoId).remove().then(() => cambiarFiltroBandeja('Pendientes')); }
 function borrarRegistroLIS(event, key) { event.stopPropagation(); if(confirm("¿ELIMINAR permanentemente?")) db.ref("resultados/" + key).remove(); }
 
+
 // === ESTADÍSTICAS Y DRILL-DOWN ===
 window.filtrarTablaParametros = function() {
     const filtro = document.getElementById('buscador-parametros').value.toUpperCase();
@@ -453,7 +454,6 @@ window.guardarInventario = function() {
         document.getElementById('inv-lote').value = ""; document.getElementById('inv-vencimiento').value = ""; document.getElementById('inv-stock').value = ""; document.getElementById('inv-minimo').value = ""; 
         document.getElementById('inv-distribuidor').value = ""; document.getElementById('inv-cant-pedido').value = ""; document.getElementById('inv-correo').value = ""; document.getElementById('inv-telefono').value = ""; 
         document.getElementById('inv-autopedido').checked = false;
-        verificarStockYPedir(codigo, item);
     });
 };
 
@@ -478,16 +478,48 @@ function renderizarInventario() {
                 <td style="color:${colorVenc}; font-weight:bold;">${item.vencimiento}</td>
                 <td style="color:${colorStock}; font-weight:bold; font-size:1.1rem;">${item.stock} ${badgeStock}</td>
                 <td>${item.autopedido ? '<span style="color:var(--success); font-weight:bold;">✔ Activado</span>' : '<span style="color:#888;">✖ Desact.</span>'}</td>
-                <td><button onclick="editarStock('${item.codigo}')" style="background:none; border:none; cursor:pointer; font-size:1.1rem;" title="Ajustar Stock">📦</button><button onclick="eliminarInventario('${item.codigo}')" style="background:none; border:none; cursor:pointer; font-size:1.1rem; color:red;" title="Eliminar">🗑️</button></td>
+                <td>
+                    <button onclick="sumarStock('${item.codigo}')" style="background:#D1FAE5; border:1px solid #10B981; border-radius:4px; cursor:pointer; font-size:1rem; padding:4px 8px; margin-right:5px;" title="Ingresar Nuevo Stock">➕</button>
+                    <button onclick="restarStock('${item.codigo}')" style="background:#FEE2E2; border:1px solid #EF4444; border-radius:4px; cursor:pointer; font-size:1rem; padding:4px 8px; margin-right:10px;" title="Dar de Baja / Retirar">➖</button>
+                    <button onclick="eliminarInventario('${item.codigo}')" style="background:none; border:none; cursor:pointer; font-size:1.1rem; color:red;" title="Eliminar Producto">🗑️</button>
+                </td>
             </tr>`;
     });
 }
 
-window.editarStock = function(codigo) {
-    const item = inventarioGlobal[codigo]; const nuevoStock = prompt(`Ajustar stock actual para ${item.nombre}:`, item.stock);
-    if(nuevoStock !== null && !isNaN(nuevoStock)) {
-        const stockActualizado = parseInt(nuevoStock);
-        db.ref("inventario/" + codigo + "/stock").set(stockActualizado).then(() => { item.stock = stockActualizado; verificarStockYPedir(codigo, item); });
+window.sumarStock = function(codigo) {
+    const item = inventarioGlobal[codigo];
+    const cantidad = prompt(`🟢 INGRESO DE STOCK\nProducto: ${item.nombre}\nStock actual: ${item.stock} unidades.\n\n¿Cuántas unidades NUEVAS acaban de llegar?`);
+    if(cantidad !== null && cantidad.trim() !== "" && !isNaN(cantidad)) {
+        const num = parseInt(cantidad);
+        if(num > 0) {
+            const stockActualizado = item.stock + num;
+            if(confirm(`Resumen de Ingreso:\nStock Anterior: ${item.stock}\nCantidad Añadida: +${num}\nNUEVO STOCK TOTAL: ${stockActualizado}\n\n¿Confirmar?`)) {
+                db.ref("inventario/" + codigo + "/stock").set(stockActualizado).then(() => {
+                    item.stock = stockActualizado;
+                    mostrarToast("Inventario", `Se agregaron ${num} unidades de ${item.nombre}.`);
+                });
+            }
+        }
+    }
+};
+
+window.restarStock = function(codigo) {
+    const item = inventarioGlobal[codigo];
+    const cantidad = prompt(`🔴 RETIRO DE STOCK\nProducto: ${item.nombre}\nStock actual: ${item.stock} unidades.\n\n¿Cuántas unidades va a RETIRAR / DAR DE BAJA?`);
+    if(cantidad !== null && cantidad.trim() !== "" && !isNaN(cantidad)) {
+        const num = parseInt(cantidad);
+        if(num > 0) {
+            const stockActualizado = item.stock - num;
+            if(stockActualizado < 0) return alert("Error: No puede retirar más unidades de las que hay en stock.");
+            if(confirm(`Resumen de Retiro:\nStock Anterior: ${item.stock}\nCantidad Retirada: -${num}\nNUEVO STOCK TOTAL: ${stockActualizado}\n\n¿Confirmar?`)) {
+                db.ref("inventario/" + codigo + "/stock").set(stockActualizado).then(() => {
+                    item.stock = stockActualizado;
+                    mostrarToast("Inventario", `Se retiraron ${num} unidades de ${item.nombre}.`);
+                    verificarStockYPedir(codigo, item);
+                });
+            }
+        }
     }
 };
 
@@ -501,7 +533,6 @@ function verificarStockYPedir(codigo, item) {
             mostrarToast("Auto-Pedido Disparado", `Enviando alerta a proveedor por ${item.nombre}`);
             db.ref("inventario/" + codigo + "/ultimo_pedido").set(hoyStr);
             
-            // Paquete de datos que Make.com leerá para armar el correo
             const payload = { 
                 codigo: item.codigo, 
                 producto: item.nombre, 
