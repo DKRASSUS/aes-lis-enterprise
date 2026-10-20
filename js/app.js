@@ -1,3 +1,4 @@
+// === LLAVE CORRECTA DE FIREBASE ====
 const firebaseConfig = {
     apiKey: "AIzaSyBLuIk-gKICLWlLSdWNAsnVYPXxqvroijI",
     authDomain: "lis-aes.firebaseapp.com",
@@ -17,8 +18,14 @@ auth.onAuthStateChanged(user => {
 });
 
 function iniciarSesion() {
-    auth.signInWithEmailAndPassword(document.getElementById('login-email').value, document.getElementById('login-pass').value)
-    .catch(error => { document.getElementById('login-error').style.display = 'block'; });
+    const email = document.getElementById('login-email').value;
+    const pass = document.getElementById('login-pass').value;
+    const errorMsg = document.getElementById('login-error');
+    errorMsg.style.display = 'none';
+    auth.signInWithEmailAndPassword(email, pass).catch(error => {
+        errorMsg.innerText = "Error: " + error.message;
+        errorMsg.style.display = 'block';
+    });
 }
 function cerrarSesion() { auth.signOut(); }
 setInterval(() => { document.getElementById('reloj').innerText = new Date().toLocaleString(); }, 1000);
@@ -78,17 +85,29 @@ function actualizarSelectSeguros() {
     Object.keys(configSeguros).forEach(nombre => { select.innerHTML += `<option value="${nombre}">${nombre} (${configSeguros[nombre]}% Desc.)</option>`; });
 }
 
-// === ADMISIÓN ===
+// === CATÁLOGO COMPLETO Y ADMISIÓN ===
 let pruebasSeleccionadas = new Set(); let preciosModificados = {}; 
 const catalogoPruebas = {
-    quimica: [ { id: "GLU", nombre: "Glucosa" }, { id: "UREA", nombre: "Urea" }, { id: "BUN", nombre: "Nitrógeno Ureico" }, { id: "CREA", nombre: "Creatinina" }, { id: "URI", nombre: "Ácido Úrico" }, { id: "COL", nombre: "Colesterol Total" }, { id: "TRIG", nombre: "Triglicéridos" }, { id: "HDL", nombre: "Colesterol HDL" }, { id: "LDL", nombre: "Colesterol LDL" }, { id: "VLDL", nombre: "Colesterol VLDL" }, { id: "AST", nombre: "AST / GOT" }, { id: "ALT", nombre: "ALT / GPT" }, { id: "ALP", nombre: "Fosfatasa Alcalina" } ],
-    inmunologia: [ { id: "TSH", nombre: "Hormona TSH" }, { id: "FT4", nombre: "T4 Libre" }, { id: "FT3", nombre: "T3 Libre" } ],
-    infecciosas: [ { id: "HIV", nombre: "VIH Ag/Ab Combo" }, { id: "HBSAG", nombre: "Antígeno de Sup. Hep B" } ],
-    marcadores: [ { id: "PSA", nombre: "PSA Total" }, { id: "CEA", nombre: "Antígeno Carcinoembrionario" }, { id: "CA125", nombre: "CA 125 (Ovario)" }, { id: "CA153", nombre: "CA 15-3 (Mama)" } ],
-    hematologia: [ { id: "HEMO", nombre: "Hemograma Completo" }, { id: "VSG", nombre: "Velocidad de Sedimentación" }, { id: "HGB", nombre: "Hemoglobina" }, { id: "HCT", nombre: "Hematocrito" }, { id: "VCM", nombre: "Índices Eritrocitarios" } ],
-    coagulacion: [ { id: "TP", nombre: "Tiempo de Protrombina" }, { id: "INR", nombre: "INR" } ]
+    quimica: [
+        { id: "GLU", nombre: "Glucosa" }, { id: "UREA", nombre: "Urea" }, { id: "BUN", nombre: "Nitrógeno Ureico" }, { id: "CREA", nombre: "Creatinina" }, { id: "URI", nombre: "Ácido Úrico" }, { id: "COL", nombre: "Colesterol Total" }, { id: "TRIG", nombre: "Triglicéridos" }, { id: "HDL", nombre: "Colesterol HDL" }, { id: "LDL", nombre: "Colesterol LDL" }, { id: "VLDL", nombre: "Colesterol VLDL" }, { id: "LIPA", nombre: "Lipoproteína (a)" }, { id: "APOA1", nombre: "Apolipoproteína A1" }, { id: "APOB", nombre: "Apolipoproteína B" }, { id: "AST", nombre: "AST / GOT" }, { id: "ALT", nombre: "ALT / GPT" }, { id: "ALP", nombre: "Fosfatasa Alcalina" }, { id: "GGT", nombre: "Gamma GT" }, { id: "LDH", nombre: "Lactato Deshidrogenasa" }, { id: "BT", nombre: "Bilirrubina Total" }, { id: "BD", nombre: "Bilirrubina Directa" }, { id: "BI", nombre: "Bilirrubina Indirecta" }, { id: "PT", nombre: "Proteínas Totales" }, { id: "ALB", nombre: "Albúmina" }, { id: "GLOB", nombre: "Globulinas" }, { id: "CA", nombre: "Calcio Total" }, { id: "CAI", nombre: "Calcio Iónico" }, { id: "P", nombre: "Fósforo" }, { id: "MG", nombre: "Magnesio" }, { id: "FE", nombre: "Hierro Sanguíneo" }, { id: "TIBC", nombre: "Capacidad Fijación Fe" }, { id: "NA", nombre: "Sodio (Na+)" }, { id: "K", nombre: "Potasio (K+)" }, { id: "CL", nombre: "Cloro (Cl-)" }, { id: "AMIL", nombre: "Amilasa" }, { id: "LIP", nombre: "Lipasa" }, { id: "HBA1C", nombre: "Hemoglobina A1c" }, { id: "PCR", nombre: "Proteína C Reactiva" }, { id: "ASO", nombre: "Antiestreptolisina O" }, { id: "FR", nombre: "Factor Reumatoide" }, { id: "C3", nombre: "Complemento C3" }, { id: "C4", nombre: "Complemento C4" }, { id: "IGA", nombre: "Inmunoglobulina A" }, { id: "IGG", nombre: "Inmunoglobulina G" }, { id: "IGM", nombre: "Inmunoglobulina M" }, { id: "DIG", nombre: "Digoxina" }, { id: "VAL", nombre: "Ácido Valproico" }, { id: "FEN", nombre: "Fenitoína" }, { id: "CBZ", nombre: "Carbamazepina" }
+    ],
+    inmunologia: [
+        { id: "TSH", nombre: "Hormona TSH" }, { id: "FT4", nombre: "T4 Libre" }, { id: "FT3", nombre: "T3 Libre" }, { id: "T4", nombre: "T4 Total" }, { id: "T3", nombre: "T3 Total" }, { id: "ATPO", nombre: "Anti-TPO" }, { id: "ATG", nombre: "Anti-Tiroglobulina" }, { id: "TRAB", nombre: "Anti-Receptor TSH" }, { id: "FSH", nombre: "Hormona FSH" }, { id: "LH", nombre: "Hormona LH" }, { id: "PRL", nombre: "Prolactina" }, { id: "E2", nombre: "Estradiol" }, { id: "E3", nombre: "Estriol Libre" }, { id: "PRG", nombre: "Progesterona" }, { id: "TESTO", nombre: "Testosterona Total" }, { id: "TESTL", nombre: "Testosterona Libre" }, { id: "SHBG", nombre: "Globulina Fijadora Sex." }, { id: "BHCG", nombre: "Beta-hCG Cuantitativa" }, { id: "AMH", nombre: "Hormona Antimülleriana" }, { id: "CORT", nombre: "Cortisol (Sérico)" }, { id: "ACTH", nombre: "Hormona ACTH" }, { id: "PTH", nombre: "Paratohormona Intacta" }, { id: "INS", nombre: "Insulina" }, { id: "CPEP", nombre: "Péptido C" }, { id: "FERR", nombre: "Ferritina" }, { id: "VITD", nombre: "Vitamina D (25-OH)" }, { id: "VITB12", nombre: "Vitamina B12" }, { id: "FOL", nombre: "Ácido Fólico" }, { id: "TROP", nombre: "Troponina I Alta Sens." }, { id: "PROBNP", nombre: "NT-proBNP" }, { id: "CKMB", nombre: "CK-MB Masa" }, { id: "MYO", nombre: "Mioglobina" }, { id: "PCT", nombre: "Procalcitonina" }, { id: "IGE", nombre: "IgE Total" }, { id: "ANA", nombre: "Anticuerpos ANA" }, { id: "ADN", nombre: "Anti-DNA dc" }
+    ],
+    infecciosas: [
+        { id: "HBSAG", nombre: "Antígeno de Sup. Hep B" }, { id: "AHBS", nombre: "Ac. Anti-HBs" }, { id: "AHBC", nombre: "Ac. Anti-HBc Total" }, { id: "AHBCM", nombre: "Ac. Anti-HBc IgM" }, { id: "HBEAG", nombre: "Antígeno HBe" }, { id: "AHBE", nombre: "Ac. Anti-HBe" }, { id: "HCV", nombre: "Anticuerpos Hep C" }, { id: "HAVM", nombre: "Hep A IgM" }, { id: "HIV", nombre: "VIH Ag/Ab Combo" }, { id: "SYPH", nombre: "Sífilis (Treponema)" }, { id: "CHAGAS", nombre: "Chagas IgG/IgM" }, { id: "TOXOG", nombre: "Toxoplasma IgG" }, { id: "TOXOM", nombre: "Toxoplasma IgM" }, { id: "RUBG", nombre: "Rubéola IgG" }, { id: "RUBM", nombre: "Rubéola IgM" }, { id: "CMVG", nombre: "Citomegalovirus IgG" }, { id: "CMVM", nombre: "Citomegalovirus IgM" }, { id: "HSV1G", nombre: "Herpes I IgG" }, { id: "HSV2G", nombre: "Herpes II IgG" }, { id: "DENG", nombre: "Dengue NS1 Ag" }, { id: "DENGM", nombre: "Dengue IgM" }, { id: "EBVG", nombre: "Epstein-Barr VCA IgG" }, { id: "EBVM", nombre: "Epstein-Barr VCA IgM" }, { id: "HPI", nombre: "Helicobacter pylori IgG" }, { id: "COVG", nombre: "SARS-CoV-2 IgG" }, { id: "COVAG", nombre: "SARS-CoV-2 Antígeno" }
+    ],
+    marcadores: [
+        { id: "PSA", nombre: "PSA Total" }, { id: "PSAL", nombre: "PSA Libre" }, { id: "CEA", nombre: "Antígeno Carcinoembrionario" }, { id: "CA125", nombre: "CA 125 (Ovario)" }, { id: "CA153", nombre: "CA 15-3 (Mama)" }, { id: "CA199", nombre: "CA 19-9 (GI/Páncreas)" }, { id: "AFP", nombre: "Alfa-fetoproteína" }, { id: "B2M", nombre: "Beta-2 Microglobulina" }, { id: "HE4", nombre: "HE4 (Ovario)" }, { id: "CYFRA", nombre: "CYFRA 21-1 (Pulmón)" }, { id: "NSE", nombre: "Enolasa Específica" }, { id: "SCC", nombre: "Antígeno Células Esc." }
+    ],
+    hematologia: [
+        { id: "HEMO", nombre: "Hemograma Completo" }, { id: "VSG", nombre: "Velocidad de Sedimentación" }, { id: "RET", nombre: "Reticulocitos" }, { id: "GS", nombre: "Grupo y Factor Rh" }, { id: "PLA", nombre: "Recuento de Plaquetas" }, { id: "LEU", nombre: "Fórmula Leucocitaria" }, { id: "HGB", nombre: "Hemoglobina" }, { id: "HCT", nombre: "Hematocrito" }, { id: "VCM", nombre: "Índices Eritrocitarios" }
+    ],
+    coagulacion: [
+        { id: "TP", nombre: "Tiempo de Protrombina" }, { id: "INR", nombre: "INR" }, { id: "TTPA", nombre: "Tiempo de Tromboplastina (APTT)" }, { id: "FIB", nombre: "Fibrinógeno" }, { id: "TT", nombre: "Tiempo de Trombina" }, { id: "DDIM", nombre: "Dímero D" }, { id: "VWFAG", nombre: "von Willebrand (Ag)" }, { id: "VWFRC", nombre: "von Willebrand (RCo)" }, { id: "FVIII", nombre: "Factor VIII" }, { id: "FIX", nombre: "Factor IX" }, { id: "FVII", nombre: "Factor VII" }, { id: "FV", nombre: "Factor V" }, { id: "FX", nombre: "Factor X" }, { id: "FXI", nombre: "Factor XI" }, { id: "FXII", nombre: "Factor XII" }, { id: "PC", nombre: "Proteína C (Actividad)" }, { id: "PS", nombre: "Proteína S (Libre)" }, { id: "ATIII", nombre: "Antitrombina III" }, { id: "LA1", nombre: "Anticoagulante Lúpico" }, { id: "AXA", nombre: "Anti-Factor Xa" }, { id: "PLAS", nombre: "Plasminógeno" }, { id: "ACA", nombre: "Anticuerpos Anticardiolipina" }
+    ]
 };
-const nombresCategorias = { quimica: "🧪 Química", inmunologia: "🧬 Inmunología", infecciosas: "🦠 Infecciosas", marcadores: "🎗️ Marcadores", hematologia: "🩸 Hematología", coagulacion: "⏱️ Coagulación" };
+const nombresCategorias = { quimica: "🧪 Química Sanguínea, TDM y Drogas", inmunologia: "🧬 Inmunología y Hormonas", infecciosas: "🦠 Serología e Infecciosas", marcadores: "🎗️ Marcadores Tumorales", hematologia: "🩸 Hematología", coagulacion: "⏱️ Coagulación y Factores" };
 
 function abrirModal(categoria) {
     document.getElementById('modal-titulo').innerText = nombresCategorias[categoria];
@@ -148,6 +167,15 @@ function buscarHistorial(ci) {
     });
 }
 
+// === FUNCIÓN DE COPIAR AL PORTAPAPELES ===
+window.copiarIDMuestra = function(id) {
+    navigator.clipboard.writeText(id).then(() => {
+        mostrarToast("Copiado al Portapapeles", `El ID ${id} está listo para pegar en el simulador.`);
+    }).catch(err => {
+        alert("Error al copiar: " + err);
+    });
+};
+
 function generarOrden() {
     const ci = document.getElementById('ci').value.trim(); const nombre = document.getElementById('nombre').value.trim();
     if(!ci || !nombre) return alert("CI y Nombre obligatorios.");
@@ -162,7 +190,14 @@ function generarOrden() {
         id_muestra: idMuestra, ci_paciente: ci, nombre_paciente: nombre, medico: document.getElementById('medico').value.trim(),
         examenes: examenesArray, seguro: seguroSelect, total_cobrado: document.getElementById('lbl-total').innerText, estado: "Pendiente", fecha_creacion: new Date().toISOString()
     }).then(() => {
-        document.getElementById('lbl-paciente-etiqueta').innerText = `${nombre} | CI: ${ci}\nSeguro: ${seguroSelect}\nExámenes: ${examenesArray.join(", ")}`;
+        // INYECCIÓN DEL BOTÓN DE COPIAR EN LA INTERFAZ
+        document.getElementById('lbl-paciente-etiqueta').innerHTML = `
+            ${nombre} | CI: ${ci}<br>
+            Seguro: ${seguroSelect} | Total: ${document.getElementById('lbl-total').innerText}<br>
+            Exámenes: ${examenesArray.join(", ")}<br><br>
+            <span style="font-size: 1.1rem; color: var(--aes-dark);">ID de Tubo: <strong>${idMuestra}</strong></span>
+            <button onclick="copiarIDMuestra('${idMuestra}')" style="background:none; border:none; cursor:pointer; font-size:1.4rem; color:var(--aes-blue); margin-left: 5px; vertical-align: middle;" title="Copiar ID para el Simulador">📋</button>
+        `;
         document.getElementById('barcode-panel').style.display = "block";
         JsBarcode("#barcode", idMuestra, { format: "CODE128", width: 2, height: 50, displayValue: true, fontSize: 16, fontOptions: "bold" });
         pruebasSeleccionadas.clear(); preciosModificados = {}; actualizarCotizacion(); document.getElementById('medico').value = ""; buscarHistorial(ci);
@@ -174,10 +209,10 @@ let datosGlobales = {}; let ordenesGlobales = {}; let pacienteSeleccionadoId = n
 let notificacionesPendientes = []; let unreadCount = 0; let keysAnteriores = new Set(); let primeraCarga = true;
 
 const diccionarioLIS = {
-    "QUÍMICA SANGUÍNEA Y ENZIMAS": ["GLU", "UREA", "BUN", "CREA", "URI", "COL", "TRIG", "HDL", "LDL", "VLDL", "AST", "ALT", "ALP"],
-    "INMUNOLOGÍA Y HORMONAS": ["TSH", "FT4", "FT3", "T4", "T3", "FSH", "LH", "PRL", "E2"],
-    "SEROLOGÍA E INFECCIOSAS": ["HBSAG", "HCV", "HIV"],
-    "MARCADORES TUMORALES": ["PSA", "CEA", "CA125", "CA153"],
+    "QUÍMICA SANGUÍNEA Y ENZIMAS": ["GLU", "UREA", "BUN", "CREA", "URI", "COL", "TRIG", "HDL", "LDL", "VLDL", "AST", "ALT", "ALP", "GGT", "LDH", "BT", "BD", "BI", "PT", "ALB", "CA", "P", "MG", "FE", "NA", "K", "CL", "AMIL", "LIP"],
+    "INMUNOLOGÍA Y HORMONAS": ["TSH", "FT4", "FT3", "T4", "T3", "FSH", "LH", "PRL", "E2", "PRG", "TESTO", "BHCG", "INS", "CORT", "FERR", "VITD", "VITB12", "FOL"],
+    "SEROLOGÍA E INFECCIOSAS": ["HBSAG", "HCV", "HIV", "SYPH", "CHAGAS", "TOXOG", "TOXOM", "DENG"],
+    "MARCADORES TUMORALES": ["PSA", "CEA", "CA125", "CA153", "CA199", "AFP"],
     "HEMATOLOGÍA Y COAGULACIÓN": ["HEMO", "VSG", "HGB", "HCT", "VCM", "TP", "INR"]
 };
 function obtenerInfoPrueba(prueba) {
@@ -186,10 +221,8 @@ function obtenerInfoPrueba(prueba) {
     return { cat: cat, ref: "Referencia según inserto" };
 }
 
-// Escuchar Órdenes (Para cruzar datos)
 db.ref("ordenes_pendientes").on("value", snap => { if(snap.exists()) { ordenesGlobales = snap.val(); renderizarBandeja(); } });
 
-// Escuchar Resultados (El motor principal)
 db.ref("resultados").on("value", snapshot => {
     if (snapshot.exists()) { 
         datosGlobales = snapshot.val(); 
@@ -197,11 +230,9 @@ db.ref("resultados").on("value", snapshot => {
             Object.keys(datosGlobales).forEach(key => {
                 if (!keysAnteriores.has(key)) {
                     const r = datosGlobales[key];
-                    // Cruzar nombre real
                     let nombreReal = r.paciente;
                     if (ordenesGlobales[r.muestra]) nombreReal = ordenesGlobales[r.muestra].nombre_paciente;
                     else if (!nombreReal || nombreReal === "Paciente Desconocido") nombreReal = "Paciente No Registrado (Huérfano)";
-                    
                     agregarNotificacion(key, nombreReal, r.muestra);
                 }
             });
@@ -211,7 +242,6 @@ db.ref("resultados").on("value", snapshot => {
     } else { datosGlobales = {}; renderizarBandeja(); }
 });
 
-// === MOTOR DE CAMPANA Y TOAST ===
 function agregarNotificacion(key, nombre, tubo) {
     unreadCount++;
     notificacionesPendientes.unshift({ key: key, nombre: nombre, tubo: tubo, leido: false });
@@ -237,24 +267,22 @@ function actualizarCampanaUI() {
     });
 }
 
-function toggleNotificaciones() {
+window.toggleNotificaciones = function() {
     const dropdown = document.getElementById('notif-dropdown');
     dropdown.classList.toggle('active');
 }
 
-function marcarTodasLeidas(e) {
+window.marcarTodasLeidas = function(e) {
     e.stopPropagation();
     notificacionesPendientes.forEach(n => n.leido = true);
     unreadCount = 0; actualizarCampanaUI();
 }
 
-function abrirDesdeNotificacion(key) {
+window.abrirDesdeNotificacion = function(key) {
     document.getElementById('notif-dropdown').classList.remove('active');
-    // Marcar como leída
     const noti = notificacionesPendientes.find(n => n.key === key);
     if(noti && !noti.leido) { noti.leido = true; unreadCount = Math.max(0, unreadCount - 1); actualizarCampanaUI(); }
     
-    // Ir a la pestaña validación y abrir paciente
     switchView('validacion', document.querySelectorAll('.nav-item')[1]);
     cambiarFiltroBandeja(datosGlobales[key].estado === "Validado_Final" ? "Validados" : "Pendientes");
     setTimeout(() => mostrarDetalle(key), 100);
@@ -268,7 +296,6 @@ function mostrarToast(titulo, desc) {
     setTimeout(() => { toast.classList.add('fade-out'); setTimeout(() => toast.remove(), 500); }, 5000);
 }
 
-// === RENDERIZADO CRUZADO DE LA BANDEJA ===
 function cambiarFiltroBandeja(nuevoFiltro) {
     filtroActual = nuevoFiltro;
     document.getElementById('btn-filtro-pendientes').classList.remove('active'); document.getElementById('btn-filtro-validados').classList.remove('active');
@@ -285,16 +312,9 @@ function renderizarBandeja() {
         
         if ((filtroActual === "Pendientes" && !estaValidado) || (filtroActual === "Validados" && estaValidado)) {
             keysMostradas++;
-            
-            // MAGIA DE CRUCE DE DATOS
-            let nombreReal = r.paciente;
-            let esHuerfano = true;
-            if (ordenesGlobales[r.muestra]) {
-                nombreReal = ordenesGlobales[r.muestra].nombre_paciente;
-                esHuerfano = false;
-            } else if (r.paciente && r.paciente !== "Paciente Desconocido") {
-                nombreReal = r.paciente; // Si el analizador mandó un nombre útil
-            }
+            let nombreReal = r.paciente; let esHuerfano = true;
+            if (ordenesGlobales[r.muestra]) { nombreReal = ordenesGlobales[r.muestra].nombre_paciente; esHuerfano = false; } 
+            else if (r.paciente && r.paciente !== "Paciente Desconocido") { nombreReal = r.paciente; }
 
             const pacienteName = esHuerfano ? "⚠️ Sin Orden" : nombreReal;
             const estiloNombre = esHuerfano ? "color: #DC2626; font-style: italic;" : "";
@@ -323,7 +343,6 @@ function mostrarDetalle(key) {
     if(estaValidado) { document.getElementById('botones-pendientes').style.display = "none"; document.getElementById('botones-validados').style.display = "flex"; document.getElementById('badge-estado-visor').innerText = "✔ ARCHIVADO"; } 
     else { document.getElementById('botones-pendientes').style.display = "flex"; document.getElementById('botones-validados').style.display = "none"; document.getElementById('badge-estado-visor').innerText = "Pendiente Firma"; }
 
-    // Cruce de datos para el PDF
     let nombreReal = r.paciente; let esHuerfano = true; let parametrosPedidos = "No registrados";
     if (ordenesGlobales[r.muestra]) {
         nombreReal = ordenesGlobales[r.muestra].nombre_paciente;
@@ -342,7 +361,6 @@ function mostrarDetalle(key) {
     const tablaLIS = document.getElementById("tabla-analitos"); const contPDF = document.getElementById("pdf-resultados-dinamicos");
     tablaLIS.innerHTML = ""; contPDF.innerHTML = "";
 
-    // Agregamos aviso visual si los parámetros difieren (Solo informativo para la web)
     if(!esHuerfano) {
         tablaLIS.insertAdjacentHTML('beforeend', `<tr><td colspan="3" style="background: #FFFBEB; padding: 10px; color: #B45309; font-size: 0.8rem;"><strong>Pruebas Solicitadas en Web:</strong> ${parametrosPedidos}</td></tr>`);
     }
@@ -379,7 +397,7 @@ function descargarSoloPDF(forzarValidacion = false) {
     const opt = { margin: 10, filename: `Informe_AES_${document.getElementById('pdf-paciente').innerText.replace(/\s+/g, '_')}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }, pagebreak: { mode: ['avoid-all', 'css', 'legacy'] } };
     html2pdf().set(opt).from(ep).save().then(() => {
         pw.style.display = 'none'; btn.innerHTML = tOriginal;
-        if(forzarValidacion) db.ref("resultados/" + pacienteSeleccionadoId).update({ estado: "Validado_Final", fecha_validacion: new Date().toISOString() });
+        if(forzarValidacion) db.ref("resultados/" + pacienteSeleccionadoId).update({ estado: "Validado_Final", fecha_validacion: new Date().toISOString() }).then(() => cambiarFiltroBandeja('Validados'));
     });
 }
 
