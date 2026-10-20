@@ -537,7 +537,7 @@ function verificarStockYPedir(codigo, item) {
         if(item.ultimo_pedido !== hoyStr) {
             
             // === AQUÍ PONES TU ENLACE DE MAKE.COM ===
-            const webhookMake = "https://hook.make.com/https://hook.us2.make.com/stfloirdmkzy7q9pm60ucb9241b8l39j"; 
+            const webhookMake = "https://hook.us2.make.com/sxnau2ywr6vffqhtz3ehrjyru305tnt0"; 
             
             // El LIS redacta la carta formal
             const mensajeFormal = `Estimados señores de ${item.distribuidor !== "N/A" ? item.distribuidor : "Ventas"},\n\n` +
