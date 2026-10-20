@@ -18,14 +18,8 @@ auth.onAuthStateChanged(user => {
 });
 
 function iniciarSesion() {
-    const email = document.getElementById('login-email').value;
-    const pass = document.getElementById('login-pass').value;
-    const errorMsg = document.getElementById('login-error');
-    errorMsg.style.display = 'none';
-    auth.signInWithEmailAndPassword(email, pass).catch(error => {
-        errorMsg.innerText = "Error: " + error.message;
-        errorMsg.style.display = 'block';
-    });
+    auth.signInWithEmailAndPassword(document.getElementById('login-email').value, document.getElementById('login-pass').value)
+    .catch(error => { document.getElementById('login-error').style.display = 'block'; });
 }
 function cerrarSesion() { auth.signOut(); }
 setInterval(() => { document.getElementById('reloj').innerText = new Date().toLocaleString(); }, 1000);
@@ -35,6 +29,16 @@ function switchView(viewId, element) {
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
     document.getElementById('view-' + viewId).classList.add('active');
     if(element) element.classList.add('active');
+    
+    // Si entramos a Estadísticas, calculamos por defecto el mes actual
+    if(viewId === 'estadisticas') {
+        const hoy = new Date();
+        const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0];
+        const finMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).toISOString().split('T')[0];
+        document.getElementById('filtro-fecha-inicio').value = inicioMes;
+        document.getElementById('filtro-fecha-fin').value = finMes;
+        calcularEstadisticas();
+    }
 }
 
 // === CEREBRO AUTÓNOMO: CONFIGURACIÓN DINÁMICA ===
@@ -88,24 +92,12 @@ function actualizarSelectSeguros() {
 // === CATÁLOGO COMPLETO Y ADMISIÓN ===
 let pruebasSeleccionadas = new Set(); let preciosModificados = {}; 
 const catalogoPruebas = {
-    quimica: [
-        { id: "GLU", nombre: "Glucosa" }, { id: "UREA", nombre: "Urea" }, { id: "BUN", nombre: "Nitrógeno Ureico" }, { id: "CREA", nombre: "Creatinina" }, { id: "URI", nombre: "Ácido Úrico" }, { id: "COL", nombre: "Colesterol Total" }, { id: "TRIG", nombre: "Triglicéridos" }, { id: "HDL", nombre: "Colesterol HDL" }, { id: "LDL", nombre: "Colesterol LDL" }, { id: "VLDL", nombre: "Colesterol VLDL" }, { id: "LIPA", nombre: "Lipoproteína (a)" }, { id: "APOA1", nombre: "Apolipoproteína A1" }, { id: "APOB", nombre: "Apolipoproteína B" }, { id: "AST", nombre: "AST / GOT" }, { id: "ALT", nombre: "ALT / GPT" }, { id: "ALP", nombre: "Fosfatasa Alcalina" }, { id: "GGT", nombre: "Gamma GT" }, { id: "LDH", nombre: "Lactato Deshidrogenasa" }, { id: "BT", nombre: "Bilirrubina Total" }, { id: "BD", nombre: "Bilirrubina Directa" }, { id: "BI", nombre: "Bilirrubina Indirecta" }, { id: "PT", nombre: "Proteínas Totales" }, { id: "ALB", nombre: "Albúmina" }, { id: "GLOB", nombre: "Globulinas" }, { id: "CA", nombre: "Calcio Total" }, { id: "CAI", nombre: "Calcio Iónico" }, { id: "P", nombre: "Fósforo" }, { id: "MG", nombre: "Magnesio" }, { id: "FE", nombre: "Hierro Sanguíneo" }, { id: "TIBC", nombre: "Capacidad Fijación Fe" }, { id: "NA", nombre: "Sodio (Na+)" }, { id: "K", nombre: "Potasio (K+)" }, { id: "CL", nombre: "Cloro (Cl-)" }, { id: "AMIL", nombre: "Amilasa" }, { id: "LIP", nombre: "Lipasa" }, { id: "HBA1C", nombre: "Hemoglobina A1c" }, { id: "PCR", nombre: "Proteína C Reactiva" }, { id: "ASO", nombre: "Antiestreptolisina O" }, { id: "FR", nombre: "Factor Reumatoide" }, { id: "C3", nombre: "Complemento C3" }, { id: "C4", nombre: "Complemento C4" }, { id: "IGA", nombre: "Inmunoglobulina A" }, { id: "IGG", nombre: "Inmunoglobulina G" }, { id: "IGM", nombre: "Inmunoglobulina M" }, { id: "DIG", nombre: "Digoxina" }, { id: "VAL", nombre: "Ácido Valproico" }, { id: "FEN", nombre: "Fenitoína" }, { id: "CBZ", nombre: "Carbamazepina" }
-    ],
-    inmunologia: [
-        { id: "TSH", nombre: "Hormona TSH" }, { id: "FT4", nombre: "T4 Libre" }, { id: "FT3", nombre: "T3 Libre" }, { id: "T4", nombre: "T4 Total" }, { id: "T3", nombre: "T3 Total" }, { id: "ATPO", nombre: "Anti-TPO" }, { id: "ATG", nombre: "Anti-Tiroglobulina" }, { id: "TRAB", nombre: "Anti-Receptor TSH" }, { id: "FSH", nombre: "Hormona FSH" }, { id: "LH", nombre: "Hormona LH" }, { id: "PRL", nombre: "Prolactina" }, { id: "E2", nombre: "Estradiol" }, { id: "E3", nombre: "Estriol Libre" }, { id: "PRG", nombre: "Progesterona" }, { id: "TESTO", nombre: "Testosterona Total" }, { id: "TESTL", nombre: "Testosterona Libre" }, { id: "SHBG", nombre: "Globulina Fijadora Sex." }, { id: "BHCG", nombre: "Beta-hCG Cuantitativa" }, { id: "AMH", nombre: "Hormona Antimülleriana" }, { id: "CORT", nombre: "Cortisol (Sérico)" }, { id: "ACTH", nombre: "Hormona ACTH" }, { id: "PTH", nombre: "Paratohormona Intacta" }, { id: "INS", nombre: "Insulina" }, { id: "CPEP", nombre: "Péptido C" }, { id: "FERR", nombre: "Ferritina" }, { id: "VITD", nombre: "Vitamina D (25-OH)" }, { id: "VITB12", nombre: "Vitamina B12" }, { id: "FOL", nombre: "Ácido Fólico" }, { id: "TROP", nombre: "Troponina I Alta Sens." }, { id: "PROBNP", nombre: "NT-proBNP" }, { id: "CKMB", nombre: "CK-MB Masa" }, { id: "MYO", nombre: "Mioglobina" }, { id: "PCT", nombre: "Procalcitonina" }, { id: "IGE", nombre: "IgE Total" }, { id: "ANA", nombre: "Anticuerpos ANA" }, { id: "ADN", nombre: "Anti-DNA dc" }
-    ],
-    infecciosas: [
-        { id: "HBSAG", nombre: "Antígeno de Sup. Hep B" }, { id: "AHBS", nombre: "Ac. Anti-HBs" }, { id: "AHBC", nombre: "Ac. Anti-HBc Total" }, { id: "AHBCM", nombre: "Ac. Anti-HBc IgM" }, { id: "HBEAG", nombre: "Antígeno HBe" }, { id: "AHBE", nombre: "Ac. Anti-HBe" }, { id: "HCV", nombre: "Anticuerpos Hep C" }, { id: "HAVM", nombre: "Hep A IgM" }, { id: "HIV", nombre: "VIH Ag/Ab Combo" }, { id: "SYPH", nombre: "Sífilis (Treponema)" }, { id: "CHAGAS", nombre: "Chagas IgG/IgM" }, { id: "TOXOG", nombre: "Toxoplasma IgG" }, { id: "TOXOM", nombre: "Toxoplasma IgM" }, { id: "RUBG", nombre: "Rubéola IgG" }, { id: "RUBM", nombre: "Rubéola IgM" }, { id: "CMVG", nombre: "Citomegalovirus IgG" }, { id: "CMVM", nombre: "Citomegalovirus IgM" }, { id: "HSV1G", nombre: "Herpes I IgG" }, { id: "HSV2G", nombre: "Herpes II IgG" }, { id: "DENG", nombre: "Dengue NS1 Ag" }, { id: "DENGM", nombre: "Dengue IgM" }, { id: "EBVG", nombre: "Epstein-Barr VCA IgG" }, { id: "EBVM", nombre: "Epstein-Barr VCA IgM" }, { id: "HPI", nombre: "Helicobacter pylori IgG" }, { id: "COVG", nombre: "SARS-CoV-2 IgG" }, { id: "COVAG", nombre: "SARS-CoV-2 Antígeno" }
-    ],
-    marcadores: [
-        { id: "PSA", nombre: "PSA Total" }, { id: "PSAL", nombre: "PSA Libre" }, { id: "CEA", nombre: "Antígeno Carcinoembrionario" }, { id: "CA125", nombre: "CA 125 (Ovario)" }, { id: "CA153", nombre: "CA 15-3 (Mama)" }, { id: "CA199", nombre: "CA 19-9 (GI/Páncreas)" }, { id: "AFP", nombre: "Alfa-fetoproteína" }, { id: "B2M", nombre: "Beta-2 Microglobulina" }, { id: "HE4", nombre: "HE4 (Ovario)" }, { id: "CYFRA", nombre: "CYFRA 21-1 (Pulmón)" }, { id: "NSE", nombre: "Enolasa Específica" }, { id: "SCC", nombre: "Antígeno Células Esc." }
-    ],
-    hematologia: [
-        { id: "HEMO", nombre: "Hemograma Completo" }, { id: "VSG", nombre: "Velocidad de Sedimentación" }, { id: "RET", nombre: "Reticulocitos" }, { id: "GS", nombre: "Grupo y Factor Rh" }, { id: "PLA", nombre: "Recuento de Plaquetas" }, { id: "LEU", nombre: "Fórmula Leucocitaria" }, { id: "HGB", nombre: "Hemoglobina" }, { id: "HCT", nombre: "Hematocrito" }, { id: "VCM", nombre: "Índices Eritrocitarios" }
-    ],
-    coagulacion: [
-        { id: "TP", nombre: "Tiempo de Protrombina" }, { id: "INR", nombre: "INR" }, { id: "TTPA", nombre: "Tiempo de Tromboplastina (APTT)" }, { id: "FIB", nombre: "Fibrinógeno" }, { id: "TT", nombre: "Tiempo de Trombina" }, { id: "DDIM", nombre: "Dímero D" }, { id: "VWFAG", nombre: "von Willebrand (Ag)" }, { id: "VWFRC", nombre: "von Willebrand (RCo)" }, { id: "FVIII", nombre: "Factor VIII" }, { id: "FIX", nombre: "Factor IX" }, { id: "FVII", nombre: "Factor VII" }, { id: "FV", nombre: "Factor V" }, { id: "FX", nombre: "Factor X" }, { id: "FXI", nombre: "Factor XI" }, { id: "FXII", nombre: "Factor XII" }, { id: "PC", nombre: "Proteína C (Actividad)" }, { id: "PS", nombre: "Proteína S (Libre)" }, { id: "ATIII", nombre: "Antitrombina III" }, { id: "LA1", nombre: "Anticoagulante Lúpico" }, { id: "AXA", nombre: "Anti-Factor Xa" }, { id: "PLAS", nombre: "Plasminógeno" }, { id: "ACA", nombre: "Anticuerpos Anticardiolipina" }
-    ]
+    quimica: [ { id: "GLU", nombre: "Glucosa" }, { id: "UREA", nombre: "Urea" }, { id: "BUN", nombre: "Nitrógeno Ureico" }, { id: "CREA", nombre: "Creatinina" }, { id: "URI", nombre: "Ácido Úrico" }, { id: "COL", nombre: "Colesterol Total" }, { id: "TRIG", nombre: "Triglicéridos" }, { id: "HDL", nombre: "Colesterol HDL" }, { id: "LDL", nombre: "Colesterol LDL" }, { id: "VLDL", nombre: "Colesterol VLDL" }, { id: "LIPA", nombre: "Lipoproteína (a)" }, { id: "APOA1", nombre: "Apolipoproteína A1" }, { id: "APOB", nombre: "Apolipoproteína B" }, { id: "AST", nombre: "AST / GOT" }, { id: "ALT", nombre: "ALT / GPT" }, { id: "ALP", nombre: "Fosfatasa Alcalina" }, { id: "GGT", nombre: "Gamma GT" }, { id: "LDH", nombre: "Lactato Deshidrogenasa" }, { id: "BT", nombre: "Bilirrubina Total" }, { id: "BD", nombre: "Bilirrubina Directa" }, { id: "BI", nombre: "Bilirrubina Indirecta" }, { id: "PT", nombre: "Proteínas Totales" }, { id: "ALB", nombre: "Albúmina" }, { id: "GLOB", nombre: "Globulinas" }, { id: "CA", nombre: "Calcio Total" }, { id: "CAI", nombre: "Calcio Iónico" }, { id: "P", nombre: "Fósforo" }, { id: "MG", nombre: "Magnesio" }, { id: "FE", nombre: "Hierro Sanguíneo" }, { id: "TIBC", nombre: "Capacidad Fijación Fe" }, { id: "NA", nombre: "Sodio (Na+)" }, { id: "K", nombre: "Potasio (K+)" }, { id: "CL", nombre: "Cloro (Cl-)" }, { id: "AMIL", nombre: "Amilasa" }, { id: "LIP", nombre: "Lipasa" }, { id: "HBA1C", nombre: "Hemoglobina A1c" }, { id: "PCR", nombre: "Proteína C Reactiva" }, { id: "ASO", nombre: "Antiestreptolisina O" }, { id: "FR", nombre: "Factor Reumatoide" }, { id: "C3", nombre: "Complemento C3" }, { id: "C4", nombre: "Complemento C4" }, { id: "IGA", nombre: "Inmunoglobulina A" }, { id: "IGG", nombre: "Inmunoglobulina G" }, { id: "IGM", nombre: "Inmunoglobulina M" }, { id: "DIG", nombre: "Digoxina" }, { id: "VAL", nombre: "Ácido Valproico" }, { id: "FEN", nombre: "Fenitoína" }, { id: "CBZ", nombre: "Carbamazepina" } ],
+    inmunologia: [ { id: "TSH", nombre: "Hormona TSH" }, { id: "FT4", nombre: "T4 Libre" }, { id: "FT3", nombre: "T3 Libre" }, { id: "T4", nombre: "T4 Total" }, { id: "T3", nombre: "T3 Total" }, { id: "ATPO", nombre: "Anti-TPO" }, { id: "ATG", nombre: "Anti-Tiroglobulina" }, { id: "TRAB", nombre: "Anti-Receptor TSH" }, { id: "FSH", nombre: "Hormona FSH" }, { id: "LH", nombre: "Hormona LH" }, { id: "PRL", nombre: "Prolactina" }, { id: "E2", nombre: "Estradiol" }, { id: "E3", nombre: "Estriol Libre" }, { id: "PRG", nombre: "Progesterona" }, { id: "TESTO", nombre: "Testosterona Total" }, { id: "TESTL", nombre: "Testosterona Libre" }, { id: "SHBG", nombre: "Globulina Fijadora Sex." }, { id: "BHCG", nombre: "Beta-hCG Cuantitativa" }, { id: "AMH", nombre: "Hormona Antimülleriana" }, { id: "CORT", nombre: "Cortisol (Sérico)" }, { id: "ACTH", nombre: "Hormona ACTH" }, { id: "PTH", nombre: "Paratohormona Intacta" }, { id: "INS", nombre: "Insulina" }, { id: "CPEP", nombre: "Péptido C" }, { id: "FERR", nombre: "Ferritina" }, { id: "VITD", nombre: "Vitamina D (25-OH)" }, { id: "VITB12", nombre: "Vitamina B12" }, { id: "FOL", nombre: "Ácido Fólico" }, { id: "TROP", nombre: "Troponina I Alta Sens." }, { id: "PROBNP", nombre: "NT-proBNP" }, { id: "CKMB", nombre: "CK-MB Masa" }, { id: "MYO", nombre: "Mioglobina" }, { id: "PCT", nombre: "Procalcitonina" }, { id: "IGE", nombre: "IgE Total" }, { id: "ANA", nombre: "Anticuerpos ANA" }, { id: "ADN", nombre: "Anti-DNA dc" } ],
+    infecciosas: [ { id: "HBSAG", nombre: "Antígeno de Sup. Hep B" }, { id: "AHBS", nombre: "Ac. Anti-HBs" }, { id: "AHBC", nombre: "Ac. Anti-HBc Total" }, { id: "AHBCM", nombre: "Ac. Anti-HBc IgM" }, { id: "HBEAG", nombre: "Antígeno HBe" }, { id: "AHBE", nombre: "Ac. Anti-HBe" }, { id: "HCV", nombre: "Anticuerpos Hep C" }, { id: "HAVM", nombre: "Hep A IgM" }, { id: "HIV", nombre: "VIH Ag/Ab Combo" }, { id: "SYPH", nombre: "Sífilis (Treponema)" }, { id: "CHAGAS", nombre: "Chagas IgG/IgM" }, { id: "TOXOG", nombre: "Toxoplasma IgG" }, { id: "TOXOM", nombre: "Toxoplasma IgM" }, { id: "RUBG", nombre: "Rubéola IgG" }, { id: "RUBM", nombre: "Rubéola IgM" }, { id: "CMVG", nombre: "Citomegalovirus IgG" }, { id: "CMVM", nombre: "Citomegalovirus IgM" }, { id: "HSV1G", nombre: "Herpes I IgG" }, { id: "HSV2G", nombre: "Herpes II IgG" }, { id: "DENG", nombre: "Dengue NS1 Ag" }, { id: "DENGM", nombre: "Dengue IgM" }, { id: "EBVG", nombre: "Epstein-Barr VCA IgG" }, { id: "EBVM", nombre: "Epstein-Barr VCA IgM" }, { id: "HPI", nombre: "Helicobacter pylori IgG" }, { id: "COVG", nombre: "SARS-CoV-2 IgG" }, { id: "COVAG", nombre: "SARS-CoV-2 Antígeno" } ],
+    marcadores: [ { id: "PSA", nombre: "PSA Total" }, { id: "PSAL", nombre: "PSA Libre" }, { id: "CEA", nombre: "Antígeno Carcinoembrionario" }, { id: "CA125", nombre: "CA 125 (Ovario)" }, { id: "CA153", nombre: "CA 15-3 (Mama)" }, { id: "CA199", nombre: "CA 19-9 (GI/Páncreas)" }, { id: "AFP", nombre: "Alfa-fetoproteína" }, { id: "B2M", nombre: "Beta-2 Microglobulina" }, { id: "HE4", nombre: "HE4 (Ovario)" }, { id: "CYFRA", nombre: "CYFRA 21-1 (Pulmón)" }, { id: "NSE", nombre: "Enolasa Específica" }, { id: "SCC", nombre: "Antígeno Células Esc." } ],
+    hematologia: [ { id: "HEMO", nombre: "Hemograma Completo" }, { id: "VSG", nombre: "Velocidad de Sedimentación" }, { id: "RET", nombre: "Reticulocitos" }, { id: "GS", nombre: "Grupo y Factor Rh" }, { id: "PLA", nombre: "Recuento de Plaquetas" }, { id: "LEU", nombre: "Fórmula Leucocitaria" }, { id: "HGB", nombre: "Hemoglobina" }, { id: "HCT", nombre: "Hematocrito" }, { id: "VCM", nombre: "Índices Eritrocitarios" } ],
+    coagulacion: [ { id: "TP", nombre: "Tiempo de Protrombina" }, { id: "INR", nombre: "INR" }, { id: "TTPA", nombre: "Tiempo de Tromboplastina (APTT)" }, { id: "FIB", nombre: "Fibrinógeno" }, { id: "TT", nombre: "Tiempo de Trombina" }, { id: "DDIM", nombre: "Dímero D" }, { id: "VWFAG", nombre: "von Willebrand (Ag)" }, { id: "VWFRC", nombre: "von Willebrand (RCo)" }, { id: "FVIII", nombre: "Factor VIII" }, { id: "FIX", nombre: "Factor IX" }, { id: "FVII", nombre: "Factor VII" }, { id: "FV", nombre: "Factor V" }, { id: "FX", nombre: "Factor X" }, { id: "FXI", nombre: "Factor XI" }, { id: "FXII", nombre: "Factor XII" }, { id: "PC", nombre: "Proteína C (Actividad)" }, { id: "PS", nombre: "Proteína S (Libre)" }, { id: "ATIII", nombre: "Antitrombina III" }, { id: "LA1", nombre: "Anticoagulante Lúpico" }, { id: "AXA", nombre: "Anti-Factor Xa" }, { id: "PLAS", nombre: "Plasminógeno" }, { id: "ACA", nombre: "Anticuerpos Anticardiolipina" } ]
 };
 const nombresCategorias = { quimica: "🧪 Química Sanguínea, TDM y Drogas", inmunologia: "🧬 Inmunología y Hormonas", infecciosas: "🦠 Serología e Infecciosas", marcadores: "🎗️ Marcadores Tumorales", hematologia: "🩸 Hematología", coagulacion: "⏱️ Coagulación y Factores" };
 
@@ -167,13 +159,8 @@ function buscarHistorial(ci) {
     });
 }
 
-// === FUNCIÓN DE COPIAR AL PORTAPAPELES ===
 window.copiarIDMuestra = function(id) {
-    navigator.clipboard.writeText(id).then(() => {
-        mostrarToast("Copiado al Portapapeles", `El ID ${id} está listo para pegar en el simulador.`);
-    }).catch(err => {
-        alert("Error al copiar: " + err);
-    });
+    navigator.clipboard.writeText(id).then(() => { mostrarToast("Copiado al Portapapeles", `El ID ${id} está copiado.`); }).catch(err => alert("Error: " + err));
 };
 
 function generarOrden() {
@@ -190,13 +177,11 @@ function generarOrden() {
         id_muestra: idMuestra, ci_paciente: ci, nombre_paciente: nombre, medico: document.getElementById('medico').value.trim(),
         examenes: examenesArray, seguro: seguroSelect, total_cobrado: document.getElementById('lbl-total').innerText, estado: "Pendiente", fecha_creacion: new Date().toISOString()
     }).then(() => {
-        // INYECCIÓN DEL BOTÓN DE COPIAR EN LA INTERFAZ
         document.getElementById('lbl-paciente-etiqueta').innerHTML = `
-            ${nombre} | CI: ${ci}<br>
-            Seguro: ${seguroSelect} | Total: ${document.getElementById('lbl-total').innerText}<br>
+            ${nombre} | CI: ${ci}<br>Seguro: ${seguroSelect} | Total: ${document.getElementById('lbl-total').innerText}<br>
             Exámenes: ${examenesArray.join(", ")}<br><br>
             <span style="font-size: 1.1rem; color: var(--aes-dark);">ID de Tubo: <strong>${idMuestra}</strong></span>
-            <button onclick="copiarIDMuestra('${idMuestra}')" style="background:none; border:none; cursor:pointer; font-size:1.4rem; color:var(--aes-blue); margin-left: 5px; vertical-align: middle;" title="Copiar ID para el Simulador">📋</button>
+            <button onclick="copiarIDMuestra('${idMuestra}')" style="background:none; border:none; cursor:pointer; font-size:1.4rem; color:var(--aes-blue); margin-left: 5px; vertical-align: middle;" title="Copiar ID">📋</button>
         `;
         document.getElementById('barcode-panel').style.display = "block";
         JsBarcode("#barcode", idMuestra, { format: "CODE128", width: 2, height: 50, displayValue: true, fontSize: 16, fontOptions: "bold" });
@@ -204,7 +189,7 @@ function generarOrden() {
     });
 }
 
-// === VALIDACIÓN CRÚZADA Y NOTIFICACIONES ===
+// === VALIDACIÓN CRÚZADA, ESTADÍSTICAS Y NOTIFICACIONES ===
 let datosGlobales = {}; let ordenesGlobales = {}; let pacienteSeleccionadoId = null; let filtroActual = "Pendientes";
 let notificacionesPendientes = []; let unreadCount = 0; let keysAnteriores = new Set(); let primeraCarga = true;
 
@@ -239,6 +224,9 @@ db.ref("resultados").on("value", snapshot => {
         }
         keysAnteriores = new Set(Object.keys(datosGlobales)); primeraCarga = false;
         renderizarBandeja(); 
+        
+        // Si estamos en la pestaña de estadísticas, actualizar en vivo
+        if(document.getElementById('view-estadisticas').classList.contains('active')) { calcularEstadisticas(); }
     } else { datosGlobales = {}; renderizarBandeja(); }
 });
 
@@ -252,37 +240,18 @@ function agregarNotificacion(key, nombre, tubo) {
 function actualizarCampanaUI() {
     const badge = document.getElementById('campana-badge');
     if(unreadCount > 0) { badge.style.display = 'block'; badge.innerText = unreadCount; } else { badge.style.display = 'none'; }
-    
     const lista = document.getElementById('notif-lista');
     if(notificacionesPendientes.length === 0) { lista.innerHTML = `<div style="padding: 20px; text-align: center; color: #888; font-size: 0.85rem;">No hay notificaciones nuevas</div>`; return; }
-    
     lista.innerHTML = "";
-    notificacionesPendientes.forEach(n => {
-        lista.innerHTML += `
-            <div class="notif-item ${n.leido ? '' : 'unread'}" onclick="abrirDesdeNotificacion('${n.key}')">
-                <div class="notif-title">${n.nombre}</div>
-                <div class="notif-desc">Tubo: <strong>${n.tubo}</strong></div>
-            </div>
-        `;
-    });
+    notificacionesPendientes.forEach(n => { lista.innerHTML += `<div class="notif-item ${n.leido ? '' : 'unread'}" onclick="abrirDesdeNotificacion('${n.key}')"><div class="notif-title">${n.nombre}</div><div class="notif-desc">Tubo: <strong>${n.tubo}</strong></div></div>`; });
 }
 
-window.toggleNotificaciones = function() {
-    const dropdown = document.getElementById('notif-dropdown');
-    dropdown.classList.toggle('active');
-}
-
-window.marcarTodasLeidas = function(e) {
-    e.stopPropagation();
-    notificacionesPendientes.forEach(n => n.leido = true);
-    unreadCount = 0; actualizarCampanaUI();
-}
-
+window.toggleNotificaciones = function() { document.getElementById('notif-dropdown').classList.toggle('active'); }
+window.marcarTodasLeidas = function(e) { e.stopPropagation(); notificacionesPendientes.forEach(n => n.leido = true); unreadCount = 0; actualizarCampanaUI(); }
 window.abrirDesdeNotificacion = function(key) {
     document.getElementById('notif-dropdown').classList.remove('active');
     const noti = notificacionesPendientes.find(n => n.key === key);
     if(noti && !noti.leido) { noti.leido = true; unreadCount = Math.max(0, unreadCount - 1); actualizarCampanaUI(); }
-    
     switchView('validacion', document.querySelectorAll('.nav-item')[1]);
     cambiarFiltroBandeja(datosGlobales[key].estado === "Validado_Final" ? "Validados" : "Pendientes");
     setTimeout(() => mostrarDetalle(key), 100);
@@ -405,3 +374,72 @@ function validarYGenerarPDF() { if(pacienteSeleccionadoId && confirm("¿Liberar 
 function revertirValidacion() { if(pacienteSeleccionadoId && confirm("¿Regresar a Pendientes?")) db.ref("resultados/" + pacienteSeleccionadoId).update({ estado: "Pendiente Validacion" }).then(() => cambiarFiltroBandeja('Pendientes')); }
 function rechazarMuestra() { if(pacienteSeleccionadoId && confirm("¿RECHAZAR y ELIMINAR?")) db.ref("resultados/" + pacienteSeleccionadoId).remove().then(() => cambiarFiltroBandeja('Pendientes')); }
 function borrarRegistroLIS(event, key) { event.stopPropagation(); if(confirm("¿ELIMINAR permanentemente?")) db.ref("resultados/" + key).remove(); }
+
+// === MÓDULO DE ESTADÍSTICAS ===
+window.calcularEstadisticas = function() {
+    const fechaIniStr = document.getElementById('filtro-fecha-inicio').value;
+    const fechaFinStr = document.getElementById('filtro-fecha-fin').value;
+    
+    if(!fechaIniStr || !fechaFinStr) return alert("Seleccione el rango de fechas");
+
+    // Convertir a formato YYMMDD (el que usan tus tubos) para filtrar inteligentemente
+    const fInicio = new Date(fechaIniStr + "T00:00:00");
+    const fFin = new Date(fechaFinStr + "T23:59:59");
+
+    let totalTubos = 0;
+    let conteoPruebas = {};
+
+    Object.keys(datosGlobales).forEach(key => {
+        const registro = datosGlobales[key];
+        const muestraID = registro.muestra || ""; // Ej: 2610195543
+        
+        // Extraemos la fecha del ID de la muestra si tiene longitud 10 (YYMMDDxxxx)
+        let fechaMuestra = null;
+        if(muestraID.length >= 6) {
+            const yy = "20" + muestraID.substring(0, 2);
+            const mm = muestraID.substring(2, 4);
+            const dd = muestraID.substring(4, 6);
+            fechaMuestra = new Date(`${yy}-${mm}-${dd}T12:00:00`);
+        }
+
+        // Validamos si entra en el rango de fechas
+        if(fechaMuestra && fechaMuestra >= fInicio && fechaMuestra <= fFin) {
+            totalTubos++;
+            
+            const resRaw = registro.resultados_totales || registro.resultados || registro.resultaos || "";
+            if(resRaw !== "") {
+                resRaw.split('~').forEach(linea => {
+                    if(linea.trim() === "") return; 
+                    const p = linea.split(':'); const nombrePrueba = p[0].trim();
+                    if(!conteoPruebas[nombrePrueba]) conteoPruebas[nombrePrueba] = 0;
+                    conteoPruebas[nombrePrueba]++;
+                });
+            }
+        }
+    });
+
+    document.getElementById('stat-total-tubos').innerText = totalTubos;
+
+    const tabla = document.getElementById('tabla-estadisticas');
+    tabla.innerHTML = "";
+
+    if (Object.keys(conteoPruebas).length === 0) {
+        document.getElementById('stat-top-prueba').innerText = "---";
+        tabla.innerHTML = `<tr><td colspan="2" style="text-align: center; padding: 20px; color: #888;">No hay resultados en estas fechas.</td></tr>`;
+        return;
+    }
+
+    // Ordenar pruebas de mayor a menor consumo
+    const pruebasOrdenadas = Object.entries(conteoPruebas).sort((a, b) => b[1] - a[1]);
+    
+    document.getElementById('stat-top-prueba').innerText = pruebasOrdenadas[0][0]; // El nombre de la prueba más solicitada
+
+    pruebasOrdenadas.forEach(([prueba, cantidad]) => {
+        tabla.innerHTML += `
+            <tr>
+                <td><strong>${prueba}</strong></td>
+                <td><span style="background: #E0F2FE; color: var(--aes-blue); font-weight: bold; padding: 5px 12px; border-radius: 20px;">${cantidad} Test(s)</span></td>
+            </tr>
+        `;
+    });
+};
