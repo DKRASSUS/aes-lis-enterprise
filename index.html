@@ -150,9 +150,19 @@
         .pdf-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 10px; }
         .pdf-table th { text-align: left; padding: 8px 15px; border-bottom: 2px solid var(--border-color); color: #555; font-size: 10px; background: #F8FAFC; }
         .pdf-table td { padding: 8px 15px; border-bottom: 1px solid #eee; }
+
+        /* NUEVO: ESTILOS DE NOTIFICACIONES (TOAST) */
+        #toast-container { position: fixed; bottom: 30px; right: 30px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
+        .toast { background: white; border-left: 4px solid var(--aes-blue); box-shadow: 0 10px 25px rgba(0,0,0,0.15); padding: 15px 20px; border-radius: 8px; display: flex; align-items: center; gap: 15px; animation: slideInRight 0.3s ease forwards; width: 300px; cursor: pointer; }
+        .toast.fade-out { animation: fadeOutRight 0.5s ease forwards; }
+        @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes fadeOutRight { from { transform: translateX(0); opacity: 1; } to { transform: translateX(120%); opacity: 0; } }
     </style>
 </head>
 <body>
+
+    <!-- CONTENEDOR DE NOTIFICACIONES TOAST -->
+    <div id="toast-container"></div>
 
     <!-- PANTALLA DE LOGIN -->
     <div id="login-screen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--aes-dark); display: flex; justify-content: center; align-items: center; z-index: 9999;">
@@ -193,7 +203,6 @@
         <nav class="side-nav">
             <div class="nav-item active" onclick="switchView('admision', this)">🏥 Admisión y Órdenes</div>
             <div class="nav-item" onclick="switchView('validacion', this)">🔬 Validación Médica</div>
-            <!-- ESQUELETO DE LA NUEVA PESTAÑA DE CONFIGURACIÓN -->
             <div class="nav-item" onclick="switchView('configuracion', this)" style="margin-top: 20px; border-top: 1px solid var(--border-color);">⚙️ Configuración</div>
         </nav>
 
@@ -336,7 +345,7 @@
                 </div>
             </div>
 
-            <!-- VISTA 3: CONFIGURACIÓN AUTÓNOMA (NUEVA FASE) -->
+            <!-- VISTA 3: CONFIGURACIÓN AUTÓNOMA -->
             <div id="view-configuracion" class="view-section">
                 <div class="panel panel-blue">
                     <h3 class="panel-title">⚙️ Configuración Administrativa (Fase en desarrollo)</h3>
@@ -474,7 +483,7 @@
             "AXA": 150, "PLAS": 150, "ACA": 150
         };
         
-        let preciosModificados = {}; // Para guardar la edición manual con el lápiz
+        let preciosModificados = {}; 
 
         const descuentosSeguro = {
             "Particular": 0.00,
@@ -743,9 +752,57 @@
             return { cat: categoriaEncontrada, ref: referenciasMOCK[prueba.toUpperCase()] || "Referencia según método/inserto" };
         }
 
+        // ==========================================
+        // NUEVO: SISTEMA DE NOTIFICACIONES Y HUÉRFANOS
+        // ==========================================
+        let keysAnteriores = new Set();
+        let primeraCarga = true;
+
         db.ref("resultados").on("value", (snapshot) => {
-            if (snapshot.exists()) { datosGlobales = snapshot.val(); renderizarBandeja(); }
+            if (snapshot.exists()) { 
+                datosGlobales = snapshot.val(); 
+                
+                // Disparar "Acuse de Recibo" para los nuevos registros
+                if (!primeraCarga) {
+                    const keysActuales = Object.keys(datosGlobales);
+                    keysActuales.forEach(key => {
+                        if (!keysAnteriores.has(key)) {
+                            const reg = datosGlobales[key];
+                            const nombreNotif = (reg.paciente && reg.paciente !== "Paciente Desconocido") ? reg.paciente : "Paciente No Registrado";
+                            mostrarNotificacion(nombreNotif, reg.muestra || "N/A");
+                        }
+                    });
+                }
+                
+                keysAnteriores = new Set(Object.keys(datosGlobales));
+                primeraCarga = false;
+
+                renderizarBandeja(); 
+            } else {
+                datosGlobales = {};
+                renderizarBandeja();
+            }
         });
+
+        function mostrarNotificacion(nombre, tubo) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerHTML = `
+                <div style="font-size: 1.8rem;">🔔</div>
+                <div>
+                    <div style="font-weight: 800; color: var(--aes-dark); font-size: 0.95rem;">¡Nuevos Resultados!</div>
+                    <div style="color: #666; font-size: 0.8rem; margin-top: 3px;">Tubo <strong>${tubo}</strong></div>
+                    <div style="color: var(--aes-blue); font-size: 0.85rem; font-weight: bold; margin-top: 2px;">${nombre}</div>
+                </div>
+            `;
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.add('fade-out');
+                setTimeout(() => toast.remove(), 500);
+            }, 5000);
+        }
 
         function cambiarFiltroBandeja(nuevoFiltro) {
             filtroActual = nuevoFiltro;
@@ -771,7 +828,13 @@
 
                 if ((filtroActual === "Pendientes" && !estaValidado) || (filtroActual === "Validados" && estaValidado)) {
                     keysMostradas++;
-                    const pacienteName = registro.paciente || "Paciente Desconocido";
+                    
+                    // LÓGICA DE PACIENTES HUÉRFANOS (URGENCIAS DE EQUIPO)
+                    const esHuerfano = (!registro.paciente || registro.paciente === "Paciente Desconocido");
+                    const pacienteName = esHuerfano ? "⚠️ Creado en Analizador" : registro.paciente;
+                    const estiloNombre = esHuerfano ? "color: #DC2626; font-style: italic;" : "";
+                    const badgeHuerfano = esHuerfano ? `<span style="background: #FEE2E2; color: #DC2626; padding: 3px 6px; border-radius: 4px; font-size: 0.65rem; font-weight: 800; margin-bottom: 5px; display: inline-block;">⚠️ SIN ORDEN WEB</span>` : "";
+
                     const idMuestra = registro.muestra || "N/A";
                     const claseActiva = (pacienteSeleccionadoId === key) ? "active" : "";
                     const clasePill = estaValidado ? "val" : "pend";
@@ -780,14 +843,15 @@
                     lista.insertAdjacentHTML('beforeend', `
                          <div class="patient-card-val ${claseActiva}" id="card-${key}" style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
                              <div style="flex: 1;" onclick="mostrarDetalle('${key}')">
-                                 <div class="patient-name">${pacienteName}</div>
+                                 ${badgeHuerfano}
+                                 <div class="patient-name" style="${estiloNombre}">${pacienteName}</div>
                                  <div class="patient-meta">
                                     <span>Tubo: <strong>${idMuestra}</strong></span>
                                     <span class="status-pill ${clasePill}">${textoPill}</span>
                                 </div>
-                         </div>
-                         <button class="btn-delete-card" onclick="borrarRegistroLIS(event, '${key}')" title="Eliminar este paciente">🗑️</button>
-                      </div>`);
+                             </div>
+                             <button class="btn-delete-card" onclick="borrarRegistroLIS(event, '${key}')" title="Eliminar este paciente">🗑️</button>
+                         </div>`);
                 }
             });
 
@@ -798,6 +862,7 @@
             pacienteSeleccionadoId = key;
             const registro = datosGlobales[key];
             const estaValidado = (registro.estado === "Validado_Final");
+            const esHuerfano = (!registro.paciente || registro.paciente === "Paciente Desconocido");
             
             document.querySelectorAll('.patient-card-val').forEach(el => el.classList.remove('active'));
             document.getElementById(`card-${key}`).classList.add('active');
@@ -814,11 +879,11 @@
                 document.getElementById('badge-estado-visor').innerText = "Pendiente Firma";
             }
 
-            document.getElementById("detalle-nombre").innerText = registro.paciente || "N/A";
+            document.getElementById("detalle-nombre").innerText = esHuerfano ? "Paciente de Urgencia (Equipo)" : registro.paciente;
             document.getElementById("detalle-muestra").innerText = registro.muestra || "N/A";
             document.getElementById("detalle-equipo").innerText = registro.equipo || "Analizador LIS";
 
-            document.getElementById("pdf-paciente").innerText = registro.paciente || "N/A";
+            document.getElementById("pdf-paciente").innerText = esHuerfano ? "Paciente No Registrado" : registro.paciente;
             document.getElementById("pdf-orden").innerText = registro.muestra || "N/A";
             document.getElementById("pdf-equipo").innerText = registro.equipo || "N/A";
             document.getElementById("pdf-fecha").innerText = registro.fecha_validacion ? new Date(registro.fecha_validacion).toLocaleString() : new Date().toLocaleString();
