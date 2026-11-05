@@ -552,7 +552,7 @@ function verificarStockYPedir(codigo, item) {
 }
 
 function enviarWebhook(codigo, item, hoyStr) {
-    const webhookMake = "https://hook.us2.make.com/sxnau2ywr6vffqhtz3ehrjyru305tnt0"; 
+    const webhookMake = "https://hook.us2.make.com/h5w14y7wlwdwh3ey492wa7kt7lbltt63"; 
     
     const mensajeFormal = "Estimados señores de " + (item.distribuidor !== "N/A" ? item.distribuidor : "Ventas") + ",\n\n" +
                           "Por medio de la presente, el laboratorio *" + configLab.nombre + "* solicita cordialmente el abastecimiento del siguiente producto para nuestro inventario:\n\n" +
