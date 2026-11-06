@@ -83,7 +83,13 @@
                             </div>
                             <button class="btn-success-adm" onclick="generarOrden()">💳 Generar Orden LIS</button>
                         </div>
-                        <div class="panel barcode-container" id="barcode-panel"><h3 class="panel-title" style="border: none; margin-bottom: 5px;">Etiqueta</h3><p style="font-size: 0.85rem; color: #555;" id="lbl-paciente-etiqueta"></p><svg id="barcode"></svg><button class="btn-print" onclick="window.print()">🖨️ Imprimir</button></div>
+                        <div class="panel barcode-container" id="barcode-panel"><h3 class="panel-title" style="border: none; margin-bottom: 5px;">Etiqueta</h3><p style="font-size: 0.85rem; color: #555;" id="lbl-paciente-etiqueta"></p><svg id="barcode"></svg>
+                            <div id="qr-paciente-box" class="qr-box" style="display:none;"><div id="qr-paciente"></div><div><b>Portal del paciente</b><br>Código: <span id="qr-pin" class="qr-pin"></span><br><small>Con este QR el paciente sigue el avance y ve sus resultados.</small></div></div>
+                            <div class="botones-etiqueta">
+                                <button class="btn-print" onclick="imprimirEtiqueta()">🏷️ Imprimir etiqueta del tubo</button>
+                                <button class="btn-print btn-comprobante" onclick="imprimirComprobante()">🧾 Imprimir comprobante del paciente (QR)</button>
+                                <button class="btn-print btn-wa" onclick="enviarAccesoWhatsApp()">📱 Enviar acceso por WhatsApp</button>
+                            </div></div>
                     </div>
                 </div>
             </div>
@@ -102,7 +108,7 @@
                             <div class="panel" style="padding-top: 10px;">
                                 <h3 class="panel-title">Resultados <span id="badge-estado-visor" style="background: #E0F2FE; color: var(--aes-blue); padding: 4px 12px; border-radius: 20px; font-size: 0.75rem;">Pendiente</span></h3>
                                 <table class="results-table"><thead><tr><th>Análisis Clínico</th><th>Valor</th><th>Unidad</th><th>Referencia</th></tr></thead><tbody id="tabla-analitos"></tbody></table>
-                                <div class="action-panel" id="botones-pendientes"><button class="action-btn btn-reject" onclick="rechazarMuestra()">✖ Rechazar</button><button class="action-btn btn-validate-pdf" onclick="validarYGenerarPDF()">✔ Validar e Imprimir</button></div>
+                                <div class="action-panel" id="botones-pendientes"><button class="action-btn btn-reject" onclick="rechazarMuestra()">✖ Rechazar</button><button class="action-btn btn-val-sel" onclick="validarSeleccionados()">☑ Validar seleccionados</button><button class="action-btn btn-validate-pdf" onclick="validarYGenerarPDF()">✔ Validar todo e Imprimir</button></div>
                                 <div class="action-panel" id="botones-validados" style="display: none;"><button class="action-btn btn-revert" onclick="revertirValidacion()">↩ Revertir</button><button class="action-btn btn-reprint" onclick="descargarSoloPDF(false)">🖨️ Re-imprimir</button></div>
                                 <div class="action-panel" id="botones-rechazados" style="display: none;"><button class="action-btn btn-revert" onclick="restaurarRechazado()">↩ Devolver a Pendientes</button></div>
                             </div>

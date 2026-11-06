@@ -25,6 +25,19 @@
         .btn:disabled { opacity: 0.6; cursor: wait; }
         .error { color: var(--rojo); font-weight: 600; font-size: 0.9rem; margin-top: 12px; display: none; }
         .cambiar { background: none; color: var(--azul); font-size: 0.85rem; margin-top: 12px; padding: 4px; }
+        .orden { padding: 16px 0; border-bottom: 1px solid var(--borde); }
+        .orden:last-of-type { border-bottom: none; }
+        .cab { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+        .estado { font-size: 0.8rem; font-weight: 800; padding: 4px 10px; border-radius: 20px; white-space: nowrap; }
+        .estado.ok { background: #D1FAE5; color: #065F46; }
+        .estado.parcial { background: #FEF3C7; color: #92400E; }
+        .estado.espera { background: #E0F2FE; color: #0369A1; }
+        .barra-av { height: 8px; background: #EEF2F6; border-radius: 6px; margin: 12px 0 8px; overflow: hidden; }
+        .barra-av div { height: 100%; background: linear-gradient(90deg, var(--azul), var(--verde)); border-radius: 6px; transition: width .4s; }
+        .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+        .chip { font-size: 0.75rem; font-weight: 700; padding: 3px 9px; border-radius: 12px; }
+        .chip.listo { background: #D1FAE5; color: #065F46; }
+        .chip.pend { background: #F1F5F9; color: #64748B; }
         .informe { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--borde); flex-wrap: wrap; }
         .informe:last-child { border-bottom: none; }
         .informe b { color: var(--oscuro); }
@@ -66,8 +79,8 @@
 
         <!-- 2) Lista de informes -->
         <div class="tarjeta" id="lista" style="display:none;">
-            <h2 id="saludo">Sus informes</h2>
-            <p class="sub">Toque <b>Ver</b> para leer el informe o <b>PDF</b> para descargarlo.</p>
+            <h2 id="saludo">Sus órdenes</h2>
+            <p class="sub">Aquí ve el avance de cada examen. Toque <b>Ver</b> para leer los resultados listos o <b>PDF</b> para descargarlos.</p>
             <div id="informes"></div>
             <div style="text-align:center;"><button class="cambiar" onclick="salir()">Salir</button></div>
         </div>
