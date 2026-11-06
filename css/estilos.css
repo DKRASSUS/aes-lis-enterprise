@@ -196,3 +196,5 @@ button.action-btn { padding: 15px 25px; border: none; border-radius: 6px; font-w
 .ok-val { color: var(--success); font-weight: 800; margin-right: 6px; }
 .results-table tr.fila-validada td { background: #F0FDF4; }
 .btn-val-sel { background: white; border: 2px solid var(--success) !important; color: var(--success); }
+.info-portal { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; background: #F3E8FF; border: 1px solid #E9D5FF; border-radius: 6px; padding: 10px 12px; margin-bottom: 15px; font-size: 0.85rem; color: var(--aes-purple); }
+.info-portal button { background: white; border: 1px solid var(--aes-purple); color: var(--aes-purple); border-radius: 5px; padding: 5px 9px; font-weight: 700; cursor: pointer; font-size: 0.78rem; }
