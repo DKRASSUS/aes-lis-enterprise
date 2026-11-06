@@ -207,3 +207,20 @@ button.action-btn { padding: 15px 25px; border: none; border-radius: 6px; font-w
 .info-ventana { padding: 0 12px 6px; font-size: 0.72rem; color: #94A3B8; }
 .item-busqueda { padding: 6px 8px; margin: 3px 0; background: #F0F9FF; border: 1px solid #BAE6FD; border-radius: 6px; cursor: pointer; color: #0C4A6E; }
 .item-busqueda:hover { background: #E0F2FE; }
+
+/* ---- Módulo Historial (v5) ---- */
+.hist-filtros { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; align-items: end; margin-bottom: 12px; }
+.hist-filtros label { display: block; font-size: 0.75rem; font-weight: bold; color: #475569; margin-bottom: 4px; }
+.hist-filtros input, .hist-filtros select { width: 100%; padding: 8px; border: 1px solid #CBD5E1; border-radius: 6px; box-sizing: border-box; }
+.hist-ancho { grid-column: span 2; }
+.hist-botones { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; }
+.hist-resumen { font-size: 0.85rem; color: #334155; margin: 6px 0 10px; }
+.hist-tabla-caja { overflow-x: auto; max-height: 65vh; overflow-y: auto; }
+.hist-tabla td { vertical-align: top; font-size: 0.85rem; }
+.chip-prueba { display: inline-block; padding: 2px 7px; margin: 2px 1px; border-radius: 10px; font-size: 0.72rem; font-weight: bold; white-space: nowrap; }
+.chip-prueba.validado { background: #DCFCE7; color: #166534; }
+.chip-prueba.pendiente { background: #FEF3C7; color: #92400E; }
+.chip-prueba.espera { background: #F1F5F9; color: #64748B; }
+.chip-prueba.rechazado { background: #FEE2E2; color: #991B1B; }
+.status-pill.sinres { background: #F1F5F9; color: #64748B; }
+.btn-abrir-hist { background: #E0F2FE; color: var(--aes-blue); border: 1px solid var(--aes-blue); border-radius: 5px; padding: 4px 10px; font-weight: bold; cursor: pointer; }
