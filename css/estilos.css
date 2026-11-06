@@ -174,3 +174,12 @@ button.action-btn { padding: 15px 25px; border: none; border-radius: 6px; font-w
 .form-row-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
 .btn-success-adm:disabled, .action-btn:disabled { opacity: 0.6; cursor: wait; }
 .pdf-firma { margin-top: 25px; padding-top: 10px; border-top: 1px solid var(--border-color); }
+
+/* === ENTREGA DE RESULTADOS === */
+.panel-entrega { border-top: 4px solid #25D366; }
+.entrega-fila { display: flex; justify-content: space-between; padding: 8px 4px; border-bottom: 1px dashed var(--border-color); font-size: 0.9rem; }
+.entrega-fila b { color: var(--success); font-weight: 700; }
+.btn-wa { background: #25D366; color: white; }
+.btn-wa:hover { background: #1EBE57; }
+.btn-mail { background: var(--aes-blue); color: white; }
+.btn-link { background: white; border: 2px solid var(--aes-purple) !important; color: var(--aes-purple); }
