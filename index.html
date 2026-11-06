@@ -61,6 +61,7 @@
                             <div class="form-group"><label>Carnet de Identidad</label><div class="search-box"><input type="text" id="ci"><button class="btn-search" onclick="buscarPaciente()">🔍 Buscar LIS</button></div></div>
                             <div class="form-group"><label>Nombre Completo</label><input type="text" id="nombre"></div>
                             <div class="form-row"><div class="form-group"><label>Nacimiento</label><input type="date" id="fecha_nac"></div><div class="form-group"><label>Género</label><select id="genero"><option value="M">Masculino</option><option value="F">Femenino</option></select></div></div>
+                            <div class="form-row"><div class="form-group"><label>📱 Celular / WhatsApp</label><input type="tel" id="celular" placeholder="Ej: 70012345"></div><div class="form-group"><label>✉️ Correo</label><input type="email" id="correo" placeholder="paciente@correo.com"></div></div>
                         </div>
                        <div class="panel" id="panel-historial" style="display: none;"><h3 class="panel-title">Historial</h3><table class="history-table"><thead><tr><th>Fecha</th><th>Médico</th><th>Pruebas</th><th>Estado</th><th>Acción</th></tr></thead><tbody id="tabla-historial"></tbody></table></div>
                     </div>
@@ -104,6 +105,15 @@
                                 <div class="action-panel" id="botones-pendientes"><button class="action-btn btn-reject" onclick="rechazarMuestra()">✖ Rechazar</button><button class="action-btn btn-validate-pdf" onclick="validarYGenerarPDF()">✔ Validar e Imprimir</button></div>
                                 <div class="action-panel" id="botones-validados" style="display: none;"><button class="action-btn btn-revert" onclick="revertirValidacion()">↩ Revertir</button><button class="action-btn btn-reprint" onclick="descargarSoloPDF(false)">🖨️ Re-imprimir</button></div>
                                 <div class="action-panel" id="botones-rechazados" style="display: none;"><button class="action-btn btn-revert" onclick="restaurarRechazado()">↩ Devolver a Pendientes</button></div>
+                            </div>
+                            <div class="panel panel-entrega" id="panel-entrega" style="display: none;">
+                                <h3 class="panel-title">📤 Entrega de Resultados</h3>
+                                <div id="estado-entrega"></div>
+                                <div class="action-panel" style="flex-wrap: wrap;">
+                                    <button class="action-btn btn-wa" onclick="enviarWhatsApp()">📱 Enviar por WhatsApp</button>
+                                    <button class="action-btn btn-mail" onclick="enviarCorreoResultados()">✉️ Enviar por Correo</button>
+                                    <button class="action-btn btn-link" onclick="copiarEnlacePortal()">🌐 Copiar enlace del portal</button>
+                                </div>
                             </div>
                             <div class="panel" style="padding-top: 10px;">
                                 <h3 class="panel-title" style="font-size: 0.9rem;">🕓 Trazabilidad (quién hizo qué)</h3>
@@ -223,6 +233,21 @@
                     </div>
                 </div>
 
+                <!-- ENTREGA DE RESULTADOS -->
+                <div class="panel panel-blue" style="margin-top: 20px; border-top-color: #25D366;">
+                    <h3 class="panel-title">📤 Entrega de Resultados y Portal del Paciente</h3>
+                    <p style="font-size: 0.85rem; color: #666; margin-top: 0;">Al validar, cada informe se publica <b>cifrado</b> en el portal del paciente. El paciente entra con su enlace o con su CI, más su código de 6 caracteres (aparece en la etiqueta de admisión, en el PDF, en el WhatsApp y en el correo).</p>
+                    <p style="font-size: 0.9rem;">Dirección del portal: <a id="conf-url-portal" href="#" target="_blank" style="color: var(--aes-blue); font-weight: bold;"></a></p>
+                    <div class="form-group" style="display: flex; align-items: center; gap: 10px; background: #F8FAFC; padding: 12px; border-radius: 6px;">
+                        <input type="checkbox" id="conf-auto-correo" style="width: 20px; height: 20px;">
+                        <label for="conf-auto-correo" style="margin: 0; text-transform: none; font-size: 0.9rem;">Enviar el correo al paciente <b>automáticamente al validar</b> (si tiene correo cargado)</label>
+                    </div>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button class="btn-success-adm" style="margin-top: 0; padding: 10px; width: auto; flex: 1;" onclick="guardarConfigEntrega()">Guardar</button>
+                        <button class="btn-success-adm" style="margin-top: 0; padding: 10px; width: auto; flex: 1; background: var(--aes-purple);" onclick="enviarPruebaMake()">🧪 Enviar datos de prueba a Make</button>
+                    </div>
+                </div>
+
                 <!-- VALORES DE REFERENCIA -->
                 <div class="panel panel-blue" style="margin-top: 20px;">
                     <h3 class="panel-title">📏 Valores de Referencia</h3>
@@ -271,20 +296,14 @@
 
     <!-- PLANTILLA PDF -->
     <div id="pdf-container">
-        <div id="plantilla-pdf">
-            <div class="pdf-header">
-                <div><h1 style="margin:0; color: #1A1A24; font-size: 28px;">AES <span style="color: #00A8E8;">O.S.</span></h1><p style="margin:0; font-size: 13px; color: #666; font-weight: bold;">LABORATORIO CLÍNICO</p></div>
-                <div style="text-align: right;"><h2 style="margin:0; color: #00A8E8; font-size: 22px;">INFORME DE RESULTADOS</h2><p style="margin:0; font-size: 12px; font-weight: bold;" id="pdf-fecha"></p></div>
-            </div>
-            <div class="pdf-patient-box"><div><strong>Paciente:</strong> <span id="pdf-paciente"></span><br><strong>CI:</strong> <span id="pdf-ci"></span><br><strong>Edad / Sexo:</strong> <span id="pdf-edad-sexo"></span><br><strong>Médico:</strong> <span id="pdf-medico"></span></div><div><strong>ID de Muestra:</strong> <span id="pdf-orden"></span><br><strong>Equipo:</strong> <span id="pdf-equipo"></span><br><strong>Estado:</strong> VALIDADO</div></div>
-            <div id="pdf-resultados-dinamicos"></div>
-            <div class="pdf-firma"><div style="font-size: 10px; color: #888;">Los valores marcados con ▲ H (alto) o ▼ L (bajo) están fuera del rango de referencia.</div><div style="margin-top: 10px; font-size: 11px;"><strong>Validado por:</strong> <span id="pdf-validado-por"></span></div></div>
-        </div>
+        <div id="plantilla-pdf"></div>
     </div>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <script src="js/informe.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>
