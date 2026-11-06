@@ -51,6 +51,8 @@
         #hoja { background: #fff; padding: 22px; border-radius: 8px; overflow-x: auto; }
         .vacio { text-align: center; color: #888; padding: 20px; }
         footer { text-align: center; color: #94A3B8; font-size: 0.75rem; padding: 10px; }
+        .ayuda { background: #F0F9FF; border: 1px solid #BAE6FD; border-radius: 8px; padding: 14px; margin-top: 12px; font-size: 0.9rem; text-align: center; }
+        .b-wa { display: inline-block; background: #25D366; color: #fff; text-decoration: none; padding: 11px 18px; border-radius: 8px; font-weight: 700; margin-top: 10px; }
         .candado { font-size: 2.4rem; text-align: center; }
         @media (max-width: 560px) { .acciones { width: 100%; } .acciones button { flex: 1; } #hoja { padding: 8px; } }
     </style>
@@ -74,6 +76,8 @@
             <input id="pin" maxlength="6" autocomplete="off" placeholder="ABC123">
             <button class="btn" id="btn-entrar" onclick="entrar()">Ver resultados</button>
             <div class="error" id="error"></div>
+            <div style="text-align:center;"><button class="cambiar" onclick="olvide()">¿Olvidó su código?</button></div>
+            <div id="ayuda-codigo" class="ayuda" style="display:none;"></div>
             <div style="text-align:center;"><button class="cambiar" id="btn-usar-ci" style="display:none;" onclick="usarCI()">Entrar con mi CI en vez del enlace</button></div>
         </div>
 
