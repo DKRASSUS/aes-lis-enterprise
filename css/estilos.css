@@ -157,3 +157,20 @@ button.action-btn { padding: 15px 25px; border: none; border-radius: 6px; font-w
 .toast.fade-out { animation: fadeOutRight 0.5s ease forwards; }
 @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 @keyframes fadeOutRight { from { transform: translateX(0); opacity: 1; } to { transform: translateX(120%); opacity: 0; } }
+
+/* === MEJORAS v2: referencias, rechazos, trazabilidad === */
+.filter-btn { padding: 13px 4px; font-size: 0.8rem; }
+.status-pill.rech { background: #FEE2E2; color: #B91C1C; }
+.badge-huerfano { background: #FEE2E2; color: #DC2626; padding: 3px 6px; border-radius: 4px; font-size: 0.65rem; font-weight: 800; margin-bottom: 5px; display: inline-block; }
+.flag { font-family: 'Inter', sans-serif; font-size: 0.75rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; margin-left: 6px; }
+.flag-h { background: #FEE2E2; color: #DC2626; }
+.flag-l { background: #DBEAFE; color: #1D4ED8; }
+.results-table tr.fila-anormal td { background: #FFF5F5; }
+.aviso-anormal { background: #FEF2F2; color: #B91C1C; padding: 10px 20px !important; font-weight: 800; font-size: 0.85rem; }
+.aviso-rechazo { background: #FEE2E2; color: #991B1B; padding: 10px 20px !important; font-size: 0.85rem; }
+.audit-item { font-size: 0.8rem; color: #475569; padding: 6px 0; border-bottom: 1px dashed var(--border-color); }
+.audit-fecha { font-family: monospace; color: #94A3B8; margin-right: 6px; }
+.form-row-3 { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 15px; }
+.form-row-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+.btn-success-adm:disabled, .action-btn:disabled { opacity: 0.6; cursor: wait; }
+.pdf-firma { margin-top: 25px; padding-top: 10px; border-top: 1px solid var(--border-color); }
