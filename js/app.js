@@ -450,6 +450,18 @@ async function generarOrden() {
     }
 }
 
+// Abre la pestaña EN EL MISMO CLIC (si se abre después de buscar datos, Chrome la bloquea)
+function pestanaReservada() {
+    const w = window.open("", "_blank");
+    if (w) { try { w.document.write("<p style='font-family:Arial;padding:30px;'>Abriendo WhatsApp...</p>"); } catch (e) { } }
+    return w;
+}
+function irA(w, url) {
+    if (w && !w.closed) { w.location.href = url; return; }
+    const ok = window.open(url, "_blank");
+    if (!ok) prompt("Chrome bloqueó la ventana. Copie este enlace y ábralo, o permita las ventanas emergentes de este sitio (icono a la derecha de la barra de direcciones):", url);
+}
+
 // ---------- Código del portal de un paciente (para reenviarlo si lo perdió) ----------
 function mostrarInfoPortal(ci, p) {
     const box = document.getElementById('info-portal');
@@ -460,12 +472,13 @@ function mostrarInfoPortal(ci, p) {
     box.style.display = "flex";
 }
 async function reenviarCodigoWhatsApp(ci) {
-    const p = (await db.ref("pacientes/" + ci).once("value")).val() || {};
-    let cel = document.getElementById('celular').value.trim() || p.celular;
+    let cel = document.getElementById('celular').value.trim();
     if (!cel) { cel = prompt("📱 Número de WhatsApp del paciente (Ej: 70012345):"); if (!cel) return; db.ref("pacientes/" + ci + "/celular").set(cel.trim()); }
+    const w = pestanaReservada();
+    const p = (await db.ref("pacientes/" + ci).once("value")).val() || {};
     const texto = "Hola " + (p.nombre || "") + " 👋\n\nEste es su acceso al portal de resultados de *" + (configLab.nombre || "el laboratorio") + "*:\n" +
         urlPortal(p.portal_token) + "\n\nCódigo de acceso: *" + p.portal_pin + "*\n\nTambién puede entrar con su CI y este código en:\n" + urlPortal();
-    window.open("https://wa.me/" + normalizarCelular(cel) + "?text=" + encodeURIComponent(texto), "_blank");
+    irA(w, "https://wa.me/" + normalizarCelular(cel) + "?text=" + encodeURIComponent(texto));
 }
 async function copiarCodigoPortal(ci) {
     const p = (await db.ref("pacientes/" + ci).once("value")).val() || {};
@@ -526,7 +539,7 @@ function enviarAccesoWhatsApp() {
     if (!cel) { cel = prompt("📱 Número de WhatsApp del paciente (Ej: 70012345):"); if (!cel) return; db.ref("pacientes/" + o.ci_paciente + "/celular").set(cel.trim()); }
     const texto = "Hola " + o.nombre_paciente + " 👋\n\nSu orden N° *" + o.id_muestra + "* fue registrada en *" + (configLab.nombre || "el laboratorio") + "* ✅\n\n" +
         "Puede seguir el avance de sus exámenes y ver sus resultados apenas estén listos aquí:\n" + urlPortal(o.token) + "\n\nCódigo de acceso: *" + o.pin + "*\n\nGracias por su confianza.";
-    window.open("https://wa.me/" + normalizarCelular(cel) + "?text=" + encodeURIComponent(texto), "_blank");
+    irA(null, "https://wa.me/" + normalizarCelular(cel) + "?text=" + encodeURIComponent(texto));
 }
 
 // =====================================================================
@@ -967,10 +980,11 @@ async function pedirDato(ci, campo, texto, validar) {
 
 async function enviarWhatsApp() {
     const key = pacienteSeleccionadoId; if (!key) return;
+    const w = pestanaReservada();
     const c = await contactoDe(key);
-    if (!c.ci) return alert("Este resultado no tiene orden web con CI: no se puede generar el acceso al portal.");
+    if (!c.ci) { if (w) w.close(); return alert("Este resultado no tiene orden web con CI: no se puede generar el acceso al portal."); }
     let cel = c.celular || await pedirDato(c.ci, "celular", "📱 Número de WhatsApp del paciente (Ej: 70012345):", v => normalizarCelular(v).length >= 10);
-    if (!cel) return;
+    if (!cel) { if (w) w.close(); return; }
     if (!datosGlobales[key].entregas || !datosGlobales[key].entregas.portal) await publicarEnPortal(key);
     const acc = await asegurarAccesoPortal(c.ci);
     const d = datosInformeTubo(key);
@@ -978,7 +992,7 @@ async function enviarWhatsApp() {
     const texto = "Hola " + d.paciente + " 👋\n\n*" + d.lab.nombre + "*: " + estado + "\n\n" +
         "Véalos y descárguelos aquí:\n" + urlPortal(acc.token) + "\n\nCódigo de acceso: *" + acc.pin + "*\n\n" +
         (d.lab.telefono ? "Consultas: " + d.lab.telefono + "\n" : "") + "Gracias por su confianza.";
-    window.open("https://wa.me/" + normalizarCelular(cel) + "?text=" + encodeURIComponent(texto), "_blank");
+    irA(w, "https://wa.me/" + normalizarCelular(cel) + "?text=" + encodeURIComponent(texto));
     await db.ref("resultados/" + key + "/entregas/whatsapp").set(new Date().toISOString());
     await registrarAuditoria(key, "Enviado por WhatsApp", "+" + normalizarCelular(cel));
     renderizarEntrega(key);
