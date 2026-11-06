@@ -143,7 +143,7 @@ window.buscarEnHistorial = async function () {
     if (!txt) { caja.innerText = ""; return; }
     if (/[.#$\[\]\/]/.test(txt)) { caja.innerText = "Texto no válido"; return; }
     caja.innerText = "Buscando...";
-    let encontrados = 0;
+    const hallados = [];
     try {
         const muestras = new Set([txt.toUpperCase(), txt]);
         // ¿Es un CI? -> todas sus órdenes
@@ -153,11 +153,26 @@ window.buscarEnHistorial = async function () {
             const o = await db.ref("ordenes_pendientes/" + m).once("value");
             if (o.exists()) ordenesExtra[m] = o.val();
             const rs = await db.ref("resultados").orderByChild("muestra").equalTo(m).once("value");
-            rs.forEach(h => { resExtra[h.key] = h.val(); seguirResultado(h.key); encontrados++; });
+            rs.forEach(h => { resExtra[h.key] = h.val(); seguirResultado(h.key); if (!hallados.includes(h.key)) hallados.push(h.key); });
         }
     } catch (e) { caja.innerText = "Error al buscar: " + e.message; return; }
     aplicarDatos();
-    caja.innerText = encontrados ? "✔ " + encontrados + " informe(s) encontrados. Revise las pestañas Pendientes / Validados / Rechazados." : "No se encontró nada con ese tubo o CI.";
+    if (!hallados.length) { caja.innerText = "No se encontró nada con ese tubo o CI."; return; }
+    // Más reciente primero
+    hallados.sort((a, b) => msDe(datosGlobales[b] || {}) - msDe(datosGlobales[a] || {}));
+    const etiqueta = { Pendientes: "Pendiente", Validados: "✔ Validado", Rechazados: "✖ Rechazado" };
+    caja.innerHTML = "<div style=\"font-weight:bold; margin-bottom:4px;\">Encontrados (" + hallados.length + ") — clic para abrir:</div>" + hallados.map(k => {
+        const r = datosGlobales[k] || {}; const f = fechaDeResultado(r);
+        return "<div class=\"item-busqueda\" onclick=\"abrirEncontrado(" + jsArg(k) + ")\"><b>" + esc(nombreDeResultado(r).nombre) + "</b> · Tubo " + esc(r.muestra || "") + (f ? " · " + esc(f.toLocaleDateString()) : "") + " · " + etiqueta[filtroDeEstado(r.estado)] + "</div>";
+    }).join("");
+    abrirEncontrado(hallados[0]);
+};
+window.abrirEncontrado = function (key) {
+    const r = datosGlobales[key]; if (!r) return;
+    const caja = document.getElementById('resultado-busqueda'); const html = caja.innerHTML;
+    cambiarFiltroBandeja(filtroDeEstado(r.estado));
+    caja.innerHTML = html; // cambiar de pestaña no borra la lista encontrada
+    setTimeout(() => { mostrarDetalle(key); const c = document.getElementById("card-" + key); if (c) c.scrollIntoView({ block: "center" }); }, 50);
 };
 window.cambiarDiasVentana = function () {
     const n = parseInt(document.getElementById('conf-dias-ventana').value, 10);
