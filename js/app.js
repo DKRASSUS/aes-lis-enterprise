@@ -193,7 +193,29 @@ function buscarHistorial(ci) {
         }
     });
 }
-
+window.cargarExamenesDesdeHistorial = function(examenesJson) {
+    try {
+        const examenes = JSON.parse(examenesJson.replace(/&quot;/g, '"'));
+        if (!examenes || examenes.length === 0) return;
+        
+        // Limpiamos la selección actual
+        pruebasSeleccionadas.clear();
+        preciosModificados = {};
+        
+        // Añadimos las pruebas del historial
+        examenes.forEach(prueba => pruebasSeleccionadas.add(prueba));
+        
+        // Actualizamos la cotización visualmente
+        actualizarCotizacion();
+        mostrarToast("Pruebas Cargadas", "Se han seleccionado " + examenes.length + " pruebas del historial.");
+        
+        // Desplazamos la vista hacia abajo para que el usuario vea la cotización y el botón generar
+        document.getElementById('panel-cotizacion').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+    } catch (e) {
+        console.error("Error al cargar exámenes:", e);
+    }
+};
 window.copiarIDMuestra = function(id) { navigator.clipboard.writeText(id).then(() => { mostrarToast("Copiado", "El ID " + id + " está copiado."); }).catch(err => alert("Error: " + err)); };
 
 function generarOrden() {
