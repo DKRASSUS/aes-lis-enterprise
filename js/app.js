@@ -424,17 +424,21 @@ async function generarOrden() {
         const t = calcularTotales();
         const detallePrecios = {}; examenesArray.forEach(id => detallePrecios[id] = precioDe(id));
 
-        await db.ref("ordenes_pendientes/" + idMuestra).set({
+        const ordenNueva = {
             id_muestra: idMuestra, ci_paciente: ci, nombre_paciente: nombre, fecha_nac: fechaNac, genero: genero, celular: celular, correo: correo,
             medico: document.getElementById('medico').value.trim(), prioridad: document.getElementById('prioridad').value,
             examenes: examenesArray, precios: detallePrecios, seguro: seguroTexto,
             subtotal: t.subtotal, descuento: t.descuento, total: t.total, total_cobrado: t.total.toFixed(2) + " Bs",
             estado: "Pendiente", fecha_creacion: new Date().toISOString(), creado_por: usuarioActual()
-        });
+        };
+        await db.ref("ordenes_pendientes/" + idMuestra).set(ordenNueva);
+        ultimaOrden = Object.assign({ pin: acceso.pin, token: acceso.token, seguro_texto: seguroTexto }, ordenNueva);
+        publicarOrdenEnPortal(idMuestra, ordenNueva).catch(e => console.warn("Portal:", e));
 
         document.getElementById('lbl-paciente-etiqueta').innerHTML = esc(nombre) + " | CI: " + esc(ci) + "<br>Seguro: " + esc(seguroTexto) + " | Total: " + t.total.toFixed(2) + " Bs<br>Exámenes: " + esc(examenesArray.join(", ")) + "<br><br><span style=\"font-size: 1.1rem; color: var(--aes-dark);\">ID de Tubo: <strong>" + idMuestra + "</strong></span><button onclick=\"copiarIDMuestra('" + idMuestra + "')\" style=\"background:none; border:none; cursor:pointer; font-size:1.4rem; color:var(--aes-blue); margin-left: 5px; vertical-align: middle;\" title=\"Copiar ID\">📋</button><br><span style=\"font-size:0.85rem;color:var(--aes-purple);\">🌐 Código del portal del paciente: <b style=\"letter-spacing:2px;\">" + acceso.pin + "</b></span>";
         document.getElementById('barcode-panel').style.display = "block";
         JsBarcode("#barcode", idMuestra, { format: "CODE128", width: 2, height: 50, displayValue: true, fontSize: 16, fontOptions: "bold" });
+        mostrarQRAdmision();
         pruebasSeleccionadas.clear(); preciosModificados = {}; actualizarCotizacion(); document.getElementById('medico').value = ""; buscarHistorial(ci);
         mostrarToast("Orden creada", "Tubo " + idMuestra);
     } catch (e) {
@@ -442,6 +446,62 @@ async function generarOrden() {
     } finally {
         btn.disabled = false; btn.innerHTML = txt;
     }
+}
+
+// ---------- Comprobante, etiqueta y acceso del paciente ----------
+let ultimaOrden = null;
+function mostrarQRAdmision() {
+    if (!ultimaOrden) return;
+    const box = document.getElementById("qr-paciente");
+    const url = qrDataURL(urlPortal(ultimaOrden.token));
+    box.innerHTML = url ? "<img src=\"" + url + "\" alt=\"QR\">" : "";
+    document.getElementById("qr-pin").innerText = ultimaOrden.pin;
+    document.getElementById("qr-paciente-box").style.display = "flex";
+}
+function ventanaImpresion(titulo, cuerpo, css) {
+    const w = window.open("", "_blank", "width=480,height=720");
+    if (!w) return alert("El navegador bloqueó la ventana de impresión. Permita las ventanas emergentes para este sitio.");
+    w.document.write("<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>" + esc(titulo) + "</title><style>" +
+        "body{font-family:Arial,Helvetica,sans-serif;margin:0;color:#111;} " + css + "</style></head><body>" + cuerpo +
+        "<script>window.onload=function(){setTimeout(function(){window.print();},300);};<\/script></body></html>");
+    w.document.close();
+}
+function imprimirEtiqueta() {
+    if (!ultimaOrden) return;
+    const svg = document.getElementById("barcode").outerHTML;
+    ventanaImpresion("Etiqueta " + ultimaOrden.id_muestra,
+        "<div class=\"et\"><div class=\"n\">" + esc(ultimaOrden.nombre_paciente) + "</div>" + svg + "<div class=\"s\">CI " + esc(ultimaOrden.ci_paciente) + " · " + esc(new Date(ultimaOrden.fecha_creacion).toLocaleDateString()) + (ultimaOrden.prioridad === "Urgencia" ? " · URGENTE" : "") + "</div></div>",
+        "@page{size:50mm 25mm;margin:0;} .et{width:50mm;height:25mm;padding:1mm 2mm;box-sizing:border-box;text-align:center;overflow:hidden;} .n{font-size:8pt;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;} svg{width:46mm;height:14mm;} .s{font-size:6.5pt;}");
+}
+function imprimirComprobante() {
+    if (!ultimaOrden) return;
+    const o = ultimaOrden, url = urlPortal(o.token);
+    const qr = qrDataURL(url);
+    const svg = document.getElementById("barcode").outerHTML;
+    ventanaImpresion("Comprobante " + o.id_muestra,
+        "<div class=\"t\"><div class=\"lab\">" + esc(configLab.nombre || "Laboratorio Clínico") + "</div>" +
+        "<div class=\"c\">" + esc([configLab.direccion, configLab.telefono].filter(Boolean).join(" · ")) + "</div><hr>" +
+        "<div class=\"tit\">COMPROBANTE DE ORDEN</div>" +
+        "<p><b>Paciente:</b> " + esc(o.nombre_paciente) + "<br><b>CI:</b> " + esc(o.ci_paciente) + "<br><b>Fecha:</b> " + esc(new Date(o.fecha_creacion).toLocaleString()) +
+        (o.medico ? "<br><b>Médico:</b> " + esc(o.medico) : "") + "<br><b>N° de orden:</b> " + esc(o.id_muestra) + "</p>" +
+        "<div class=\"bc\">" + svg + "</div>" +
+        "<p><b>Exámenes (" + o.examenes.length + "):</b><br>" + esc(o.examenes.join(", ")) + "</p>" +
+        "<p><b>Total:</b> " + esc(o.total_cobrado) + (o.seguro_texto ? "<br><small>" + esc(o.seguro_texto) + "</small>" : "") + "</p><hr>" +
+        "<div class=\"tit\">VEA SUS RESULTADOS EN LÍNEA</div>" +
+        (qr ? "<img class=\"qr\" src=\"" + qr + "\">" : "") +
+        "<p class=\"ctr\">Escanee el código con su celular<br>o entre a:<br><small>" + esc(urlPortal()) + "</small></p>" +
+        "<p class=\"ctr\">Código de acceso:<br><span class=\"pin\">" + esc(o.pin) + "</span></p>" +
+        "<p class=\"ctr small\">Podrá ver el avance de cada examen y descargar los resultados apenas estén validados.<br>Guarde este comprobante: el código sirve para todas sus órdenes.</p></div>",
+        "@page{margin:6mm;} .t{width:72mm;margin:0 auto;font-size:9.5pt;} .lab{font-size:13pt;font-weight:bold;text-align:center;} .c{font-size:8pt;text-align:center;color:#444;} .tit{font-weight:bold;text-align:center;margin:6px 0;font-size:10pt;} .bc{text-align:center;} .bc svg{width:62mm;height:22mm;} .qr{display:block;width:38mm;height:38mm;margin:4px auto;} .ctr{text-align:center;} .pin{font-size:18pt;font-weight:bold;letter-spacing:4px;} .small{font-size:7.5pt;color:#444;} hr{border:none;border-top:1px dashed #999;}");
+}
+function enviarAccesoWhatsApp() {
+    if (!ultimaOrden) return;
+    const o = ultimaOrden;
+    let cel = o.celular;
+    if (!cel) { cel = prompt("📱 Número de WhatsApp del paciente (Ej: 70012345):"); if (!cel) return; db.ref("pacientes/" + o.ci_paciente + "/celular").set(cel.trim()); }
+    const texto = "Hola " + o.nombre_paciente + " 👋\n\nSu orden N° *" + o.id_muestra + "* fue registrada en *" + (configLab.nombre || "el laboratorio") + "* ✅\n\n" +
+        "Puede seguir el avance de sus exámenes y ver sus resultados apenas estén listos aquí:\n" + urlPortal(o.token) + "\n\nCódigo de acceso: *" + o.pin + "*\n\nGracias por su confianza.";
+    window.open("https://wa.me/" + normalizarCelular(cel) + "?text=" + encodeURIComponent(texto), "_blank");
 }
 
 // =====================================================================
@@ -542,7 +602,8 @@ function renderizarBandeja() {
         const pacienteName = info.huerfano ? "⚠️ " + info.nombre : info.nombre;
         const estiloNombre = info.huerfano ? "color: #DC2626; font-style: italic;" : "";
         const badgeHuerfano = info.huerfano ? "<span class=\"badge-huerfano\">⚠️ SIN ORDEN WEB</span>" : "";
-        const pill = r.estado === "Validado_Final" ? "<span class=\"status-pill val\">✔ Validado</span>" : (r.estado === "Rechazado" ? "<span class=\"status-pill rech\">✖ Rechazado</span>" : "<span class=\"status-pill pend\">Pendiente</span>");
+        const nv = r.validados ? Object.keys(r.validados).length : 0, nt = listaResultados(r).length;
+        const pill = r.estado === "Validado_Final" ? "<span class=\"status-pill val\">✔ Validado</span>" : (r.estado === "Rechazado" ? "<span class=\"status-pill rech\">✖ Rechazado</span>" : (nv ? "<span class=\"status-pill parc\">Parcial " + nv + "/" + nt + "</span>" : "<span class=\"status-pill pend\">Pendiente</span>"));
         const activeClass = (pacienteSeleccionadoId === key) ? 'active' : '';
         // El borrado definitivo solo existe en la pestaña Rechazados
         const btnBorrar = (r.estado === "Rechazado") ? "<button class=\"btn-delete-card\" title=\"Eliminar definitivamente\" onclick=\"borrarRegistroLIS(event, " + jsArg(key) + ")\">🗑️</button>" : "";
@@ -552,17 +613,21 @@ function renderizarBandeja() {
 }
 
 // ---------- Datos del informe (los usan pantalla, PDF y portal) ----------
-function datosInforme(key) {
+function pruebaValidada(r, n) { return r.estado === "Validado_Final" || !!(r.validados && r.validados[String(n).toUpperCase()]); }
+function datosInforme(key, soloValidados) {
     const r = datosGlobales[key]; if (!r) return null;
     const info = nombreDeResultado(r); const o = info.orden;
     const genero = o ? o.genero : undefined;
     const grupos = {}; let anormales = 0;
     listaResultados(r).forEach(x => {
+        const val = pruebaValidada(r, x.n);
+        if (soloValidados && !val) return;
         const ref = resolverReferencia(x.n, genero, x.refEq);
         const flag = calcularFlag(x.v, ref);
         if (flag) anormales++;
         const cat = categoriaDe(x.n);
-        (grupos[cat] = grupos[cat] || []).push({ n: x.n, v: x.v, u: x.u || ref.unidad, ref: ref.texto, flag: flag });
+        const vinfo = (r.validados || {})[String(x.n).toUpperCase()] || {};
+        (grupos[cat] = grupos[cat] || []).push({ n: x.n, v: x.v, u: x.u || ref.unidad, ref: ref.texto, flag: flag, val: val, vpor: vinfo.por || r.validado_por || "", vfecha: vinfo.fecha || r.fecha_validacion || "" });
     });
     return {
         lab: { nombre: configLab.nombre || "Laboratorio Clínico", direccion: configLab.direccion || "", telefono: configLab.telefono || "" },
@@ -572,6 +637,37 @@ function datosInforme(key) {
         fecha: r.fecha_validacion || null, validado_por: r.validado_por || "",
         grupos: grupos, anormales: anormales, examenes_web: (o && o.examenes) ? o.examenes : []
     };
+}
+
+// Une todos los resultados VALIDADOS del mismo tubo (+ el que se está validando) en un solo informe
+function datosInformeTubo(key, forzarValidacion) {
+    const base = datosInforme(key, true); if (!base) return null;
+    const muestra = datosGlobales[key].muestra;
+    const keys = Object.keys(datosGlobales).filter(k => datosGlobales[k].muestra === muestra && (datosGlobales[k].estado === "Validado_Final" || datosGlobales[k].validados || k === key));
+    keys.sort((a, b) => String(datosGlobales[a].fecha_validacion || "9").localeCompare(String(datosGlobales[b].fecha_validacion || "9")));
+    const filas = {}, orden = [], validadores = new Set(), equipos = new Set(); let ultima = null;
+    keys.forEach(k => {
+        const todo = (k === key && forzarValidacion);
+        const d = datosInforme(k, !todo), r = datosGlobales[k];
+        Object.keys(d.grupos).forEach(cat => d.grupos[cat].forEach(x => {
+            const id = x.n.toUpperCase();
+            if (!filas[id]) orden.push(id);
+            filas[id] = Object.assign({ cat: cat }, x);   // si se repitió la prueba, queda la última validada
+            const fv = todo ? new Date().toISOString() : x.vfecha;
+            const vp = todo ? usuarioActual() : x.vpor;
+            if (fv && (!ultima || fv > ultima)) ultima = fv;
+            if (vp) validadores.add(vp);
+        }));
+        if (r.equipo && Object.keys(d.grupos).length) equipos.add(r.equipo);
+    });
+    const grupos = {}; let anormales = 0;
+    orden.forEach(id => { const x = filas[id]; if (x.flag) anormales++; (grupos[x.cat] = grupos[x.cat] || []).push({ n: x.n, v: x.v, u: x.u, ref: x.ref, flag: x.flag }); });
+    const listos = new Set(orden);
+    base.grupos = grupos; base.anormales = anormales;
+    base.fecha = ultima; base.validado_por = Array.from(validadores).join(", ");
+    base.equipo = Array.from(equipos).join(", ") || base.equipo;
+    base.pendientes = (base.examenes_web || []).filter(e => !listos.has(String(e).toUpperCase()));
+    return base;
 }
 
 function mostrarDetalle(key) {
@@ -585,9 +681,11 @@ function mostrarDetalle(key) {
     const bp = document.getElementById('botones-pendientes'), bv = document.getElementById('botones-validados'), br = document.getElementById('botones-rechazados'), badge = document.getElementById('badge-estado-visor');
     const pe = document.getElementById('panel-entrega');
     bp.style.display = bv.style.display = br.style.display = pe.style.display = "none";
+    const nVal = r.validados ? Object.keys(r.validados).length : 0;
     if (estado === "Validado_Final") { bv.style.display = "flex"; pe.style.display = "block"; badge.innerText = "✔ VALIDADO"; }
     else if (estado === "Rechazado") { br.style.display = "flex"; badge.innerText = "✖ RECHAZADO"; }
-    else { bp.style.display = "flex"; badge.innerText = "Pendiente Firma"; }
+    else { bp.style.display = "flex"; badge.innerText = nVal ? "Validación parcial" : "Pendiente Firma"; if (nVal) pe.style.display = "block"; }
+    const editable = estado !== "Validado_Final" && estado !== "Rechazado";
 
     const d = datosInforme(key);
     document.getElementById("detalle-nombre").innerText = d.huerfano ? d.paciente + " (sin orden web)" : d.paciente;
@@ -601,10 +699,13 @@ function mostrarDetalle(key) {
     const cats = Object.keys(d.grupos);
     if (cats.length === 0) hT += "<tr><td colspan=\"4\" style=\"text-align: center; padding: 20px;\">Sin resultados</td></tr>";
     cats.forEach(cat => {
-        hT += "<tr style=\"background: #F3E8FF;\"><td colspan=\"4\" style=\"padding: 10px 20px; font-weight: 800; color: var(--aes-purple); font-size: 0.85rem;\">🏷️ " + esc(cat) + "</td></tr>";
+        const pendArea = d.grupos[cat].filter(x => !x.val).length;
+        const btnArea = (editable && pendArea) ? "<button class=\"btn-area\" onclick=\"validarArea(" + jsArg(cat) + ")\">✔ Validar área (" + pendArea + ")</button>" : "";
+        hT += "<tr style=\"background: #F3E8FF;\"><td colspan=\"4\" style=\"padding: 10px 20px; font-weight: 800; color: var(--aes-purple); font-size: 0.85rem;\"><div style=\"display:flex;justify-content:space-between;align-items:center;\"><span>🏷️ " + esc(cat) + "</span>" + btnArea + "</div></td></tr>";
         d.grupos[cat].forEach(x => {
             const flagHtml = x.flag === "H" ? " <span class=\"flag flag-h\">▲ H</span>" : (x.flag === "L" ? " <span class=\"flag flag-l\">▼ L</span>" : "");
-            hT += "<tr class=\"" + (x.flag ? "fila-anormal" : "") + "\"><td style=\"padding-left: 35px;\"><strong>" + esc(x.n) + "</strong></td><td style=\"font-family: monospace; font-size:1.1rem;\">" + esc(x.v) + flagHtml + "</td><td><span class=\"unit-badge\">" + esc(x.u || '-') + "</span></td><td style=\"color:#64748B; font-size:0.85rem;\">" + esc(x.ref) + "</td></tr>";
+            const marca = !editable ? "" : (x.val ? "<span class=\"ok-val\" title=\"Validado por " + esc(x.vpor) + "\">✔</span> " : "<input type=\"checkbox\" class=\"chk-val\" data-p=\"" + esc(x.n) + "\"> ");
+            hT += "<tr class=\"" + (x.flag ? "fila-anormal" : "") + (editable && x.val ? " fila-validada" : "") + "\"><td style=\"padding-left: 20px;\">" + marca + "<strong>" + esc(x.n) + "</strong></td><td style=\"font-family: monospace; font-size:1.1rem;\">" + esc(x.v) + flagHtml + "</td><td><span class=\"unit-badge\">" + esc(x.u || '-') + "</span></td><td style=\"color:#64748B; font-size:0.85rem;\">" + esc(x.ref) + "</td></tr>";
         });
     });
     document.getElementById("tabla-analitos").innerHTML = hT;
@@ -633,14 +734,13 @@ function qrDataURL(texto) {
     } catch (e) { return ""; }
 }
 async function prepararPlantillaPDF(key, forzarValidacion) {
-    const d = datosInforme(key);
-    if (forzarValidacion) { d.fecha = new Date().toISOString(); d.validado_por = usuarioActual(); }
-    let extra = {};
+    const d = datosInformeTubo(key, forzarValidacion);
+    let extra = { pendientes: d.pendientes };
     if (!d.huerfano && d.ci) {
         try {
             const acc = await asegurarAccesoPortal(d.ci);
             const url = urlPortal(acc.token);
-            extra = { qr: qrDataURL(url), portal: urlPortal(), pin: acc.pin };
+            extra = { qr: qrDataURL(url), portal: urlPortal(), pin: acc.pin, pendientes: d.pendientes };
         } catch (e) { console.warn("Sin datos de portal para el PDF:", e); }
     }
     document.getElementById('plantilla-pdf').innerHTML = AESInforme.html(d, extra);
@@ -665,7 +765,7 @@ async function descargarSoloPDF(forzarValidacion) {
             await db.ref("resultados/" + idActual).update({ estado: "Validado_Final", fecha_validacion: d.fecha, validado_por: d.validado_por });
             await registrarAuditoria(idActual, "Validado y liberado");
             await publicarEnPortal(idActual);
-            if (configEntrega.auto_correo) {
+            if (configEntrega.auto_correo && d.pendientes.length === 0) {   // el correo automático va cuando la orden está completa
                 const contacto = await contactoDe(idActual);
                 if (contacto.correo) enviarCorreoResultados(idActual, true);
             }
@@ -679,6 +779,32 @@ async function descargarSoloPDF(forzarValidacion) {
         btn.innerHTML = tOriginal; btn.disabled = false;
     }
 }
+// ---------- Validación por parámetro y por área ----------
+async function validarPruebas(lista) {
+    const key = pacienteSeleccionadoId; const r = datosGlobales[key]; if (!r) return;
+    lista = Array.from(new Set(lista)).filter(n => !pruebaValidada(r, n));
+    if (!lista.length) return alert("Marque al menos una prueba que no esté validada.");
+    if (!confirm("¿Validar y liberar al paciente: " + lista.join(", ") + "?")) return;
+    const ahora = new Date().toISOString(), por = usuarioActual(), upd = {};
+    lista.forEach(n => upd["validados/" + String(n).toUpperCase()] = { por: por, fecha: ahora });
+    await db.ref("resultados/" + key).update(upd);
+    const r2 = datosGlobales[key];
+    const faltan = listaResultados(r2).filter(x => !pruebaValidada(r2, x.n));
+    if (!faltan.length) await db.ref("resultados/" + key).update({ estado: "Validado_Final", fecha_validacion: ahora, validado_por: por });
+    await registrarAuditoria(key, faltan.length ? "Validación parcial" : "Validado y liberado", lista.join(", "));
+    const est = await publicarEnPortal(key);
+    mostrarToast("Liberado al paciente", lista.join(", ") + (est ? " · orden " + est.listos + "/" + est.total : ""));
+    if (est && est.completo && configEntrega.auto_correo) { const c = await contactoDe(key); if (c.correo) enviarCorreoResultados(key, true); }
+    if (!faltan.length) cambiarFiltroBandeja('Validados'); else mostrarDetalle(key);
+}
+function validarSeleccionados() {
+    validarPruebas(Array.from(document.querySelectorAll('#tabla-analitos .chk-val:checked')).map(c => c.getAttribute('data-p')));
+}
+function validarArea(cat) {
+    const d = datosInforme(pacienteSeleccionadoId);
+    validarPruebas((d.grupos[cat] || []).filter(x => !x.val).map(x => x.n));
+}
+
 function validarYGenerarPDF() { if (pacienteSeleccionadoId && confirm("¿Liberar reporte médico?")) descargarSoloPDF(true); }
 
 function revertirValidacion() {
@@ -686,9 +812,9 @@ function revertirValidacion() {
     const motivo = prompt("↩ Motivo para revertir la validación (obligatorio):");
     if (!motivo || !motivo.trim()) return;
     const id = pacienteSeleccionadoId;
-    db.ref("resultados/" + id).update({ estado: "Pendiente Validacion", fecha_validacion: null, validado_por: null })
+    db.ref("resultados/" + id).update({ estado: "Pendiente Validacion", fecha_validacion: null, validado_por: null, validados: null })
         .then(() => registrarAuditoria(id, "Validación revertida", motivo.trim()))
-        .then(() => despublicarDePortal(id))
+        .then(() => publicarEnPortal(id))
         .then(() => cambiarFiltroBandeja('Pendientes'));
 }
 // Rechazar ya NO borra: marca como Rechazado y guarda motivo y usuario
@@ -740,30 +866,43 @@ async function asegurarAccesoPortal(ci) {
     return { token: token, pin: pin };
 }
 
-async function publicarEnPortal(key) {
-    const d = datosInforme(key);
-    if (!d || d.huerfano || !d.ci) { mostrarToast("Portal", "No se publicó: el resultado no tiene orden web con CI."); return false; }
-    try {
-        const acc = await asegurarAccesoPortal(d.ci);
-        const r = datosGlobales[key] || {};
-        d.fecha = r.fecha_validacion || d.fecha || new Date().toISOString();
-        d.validado_por = r.validado_por || d.validado_por || usuarioActual();
-        const paquete = await AESInforme.cifrar(d, acc.pin, acc.token);
-        await db.ref("portal/" + acc.token + "/informes/" + key).set({ fecha: d.fecha, iv: paquete.iv, datos: paquete.datos });
-        await db.ref("resultados/" + key + "/entregas/portal").set(new Date().toISOString());
-        await registrarAuditoria(key, "Publicado en el portal del paciente");
-        return true;
-    } catch (e) {
-        console.error(e); mostrarToast("Portal", "No se pudo publicar en el portal: " + e.message); return false;
-    }
+// El portal guarda UNA entrada por orden (tubo): pruebas pendientes/listas + informe con lo ya validado
+async function publicarOrdenEnPortal(muestra, ordenDirecta) {
+    const o = ordenDirecta || ordenesGlobales[muestra];
+    if (!o || !o.ci_paciente) return false;
+    const acc = await asegurarAccesoPortal(o.ci_paciente);
+    const validados = Object.keys(datosGlobales).filter(k => datosGlobales[k].muestra === muestra && (datosGlobales[k].estado === "Validado_Final" || datosGlobales[k].validados));
+    const d = validados.length ? datosInformeTubo(validados[0]) : null;
+    const listos = new Set();
+    if (d) Object.values(d.grupos).forEach(g => g.forEach(x => listos.add(x.n.toUpperCase())));
+    const examenes = (o.examenes || []).map(e => ({ codigo: e, estado: listos.has(String(e).toUpperCase()) ? "listo" : "pendiente" }));
+    listos.forEach(t => { if (!examenes.some(x => String(x.codigo).toUpperCase() === t)) examenes.push({ codigo: t, estado: "listo" }); });
+    const completo = examenes.length > 0 && examenes.every(x => x.estado === "listo");
+    const obj = {
+        v: 2, muestra: muestra, fecha_orden: o.fecha_creacion, medico: o.medico || "", paciente: o.nombre_paciente,
+        lab: { nombre: configLab.nombre || "Laboratorio Clínico", direccion: configLab.direccion || "", telefono: configLab.telefono || "" },
+        examenes: examenes, completo: completo, d: d, actualizado: new Date().toISOString()
+    };
+    const paquete = await AESInforme.cifrar(obj, acc.pin, acc.token);
+    await db.ref("portal/" + acc.token + "/informes/" + muestra).set({ fecha: o.fecha_creacion || new Date().toISOString(), iv: paquete.iv, datos: paquete.datos });
+    return { completo: completo, listos: examenes.filter(x => x.estado === "listo").length, total: examenes.length };
 }
-async function despublicarDePortal(key) {
-    const d = datosInforme(key); if (!d || !d.ci) return;
-    const p = (await db.ref("pacientes/" + d.ci).once("value")).val() || {};
-    if (p.portal_token) {
-        await db.ref("portal/" + p.portal_token + "/informes/" + key).remove();
-        await db.ref("resultados/" + key + "/entregas/portal").remove();
-        await registrarAuditoria(key, "Retirado del portal del paciente");
+async function publicarEnPortal(key) {
+    const r = datosGlobales[key];
+    const info = r ? nombreDeResultado(r) : null;
+    if (!r || !info || info.huerfano) { mostrarToast("Portal", "No se publicó: el resultado no tiene orden web."); return false; }
+    try {
+        const estado = await publicarOrdenEnPortal(r.muestra);
+        if (r.estado === "Validado_Final" || r.validados) {
+            await db.ref("resultados/" + key + "/entregas/portal").set(new Date().toISOString());
+            await registrarAuditoria(key, "Publicado en el portal del paciente", estado ? estado.listos + " de " + estado.total + " pruebas listas" : "");
+        } else {
+            await db.ref("resultados/" + key + "/entregas/portal").remove();
+            await registrarAuditoria(key, "Retirado del portal del paciente");
+        }
+        return estado;
+    } catch (e) {
+        console.error(e); mostrarToast("Portal", "No se pudo actualizar el portal: " + e.message); return false;
     }
 }
 
@@ -809,8 +948,9 @@ async function enviarWhatsApp() {
     if (!cel) return;
     if (!datosGlobales[key].entregas || !datosGlobales[key].entregas.portal) await publicarEnPortal(key);
     const acc = await asegurarAccesoPortal(c.ci);
-    const d = datosInforme(key);
-    const texto = "Hola " + d.paciente + " 👋\n\nSus resultados de *" + d.lab.nombre + "* ya están listos ✅\n\n" +
+    const d = datosInformeTubo(key);
+    const estado = d.pendientes.length ? "Ya tiene resultados listos ✅ (faltan " + d.pendientes.length + " prueba(s), le avisaremos)" : "Sus resultados ya están listos ✅";
+    const texto = "Hola " + d.paciente + " 👋\n\n*" + d.lab.nombre + "*: " + estado + "\n\n" +
         "Véalos y descárguelos aquí:\n" + urlPortal(acc.token) + "\n\nCódigo de acceso: *" + acc.pin + "*\n\n" +
         (d.lab.telefono ? "Consultas: " + d.lab.telefono + "\n" : "") + "Gracias por su confianza.";
     window.open("https://wa.me/" + normalizarCelular(cel) + "?text=" + encodeURIComponent(texto), "_blank");
@@ -834,10 +974,11 @@ async function enviarCorreoResultados(keyParam, automatico) {
         const uri = await conPlantillaVisible(() => html2pdf().set(opt).from(document.getElementById('plantilla-pdf')).outputPdf('datauristring'));
         const pdf64 = String(uri).split(",").pop();
         const enlace = urlPortal(acc.token);
+        const parcial = d.pendientes && d.pendientes.length ? "<p style=\"background:#FFFBEB;border:1px solid #FCD34D;padding:10px;border-radius:6px;\">⏳ <b>Informe parcial:</b> todavía faltan " + esc(d.pendientes.join(", ")) + ". Le avisaremos cuando estén listos.</p>" : "";
         const html = "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#333;max-width:600px;\">" +
             "<div style=\"background:#1A1A24;color:#fff;padding:16px 20px;border-radius:6px 6px 0 0;\"><b style=\"font-size:17px;\">Sus resultados están listos</b><br><span style=\"color:#00A8E8;\">" + esc(d.lab.nombre) + "</span></div>" +
             "<div style=\"border:1px solid #E2E8F0;border-top:none;padding:20px;border-radius:0 0 6px 6px;\">" +
-            "<p>Estimado/a <b>" + esc(d.paciente) + "</b>:</p><p>Le informamos que los resultados de su muestra <b>" + esc(d.muestra) + "</b> ya fueron validados. Le adjuntamos el informe en PDF.</p>" +
+            "<p>Estimado/a <b>" + esc(d.paciente) + "</b>:</p><p>Le informamos que los resultados de su muestra <b>" + esc(d.muestra) + "</b> ya fueron validados. Le adjuntamos el informe en PDF.</p>" + parcial +
             "<p>También puede verlos y descargarlos cuando quiera desde su portal:</p>" +
             "<p style=\"text-align:center;margin:22px 0;\"><a href=\"" + enlace + "\" style=\"background:#00A8E8;color:#fff;text-decoration:none;padding:12px 26px;border-radius:6px;font-weight:bold;\">Ver mis resultados</a></p>" +
             "<p style=\"text-align:center;\">Código de acceso: <b style=\"font-size:18px;letter-spacing:3px;\">" + acc.pin + "</b></p>" +

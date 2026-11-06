@@ -16,17 +16,20 @@ window.AESInforme = (function () {
     function html(d, extra) {
         extra = extra || {};
         const azul = "#00A8E8", oscuro = "#1A1A24";
+        const pendientes = extra.pendientes || d.pendientes || [];
+        const parcial = pendientes.length > 0;
         let h = "<div style=\"font-family:Inter,Helvetica,Arial,sans-serif;color:#333;font-size:12px;\">";
         // Encabezado
         h += "<div style=\"display:flex;justify-content:space-between;align-items:flex-end;border-bottom:4px solid " + azul + ";padding-bottom:12px;margin-bottom:14px;\">" +
             "<div><div style=\"font-size:24px;font-weight:800;color:" + oscuro + ";\">" + esc(d.lab.nombre || "Laboratorio Clínico") + "</div>" +
             "<div style=\"font-size:11px;color:#666;\">" + esc([d.lab.direccion, d.lab.telefono].filter(Boolean).join(" · ")) + "</div></div>" +
-            "<div style=\"text-align:right;\"><div style=\"font-size:18px;font-weight:800;color:" + azul + ";\">INFORME DE RESULTADOS</div>" +
+            "<div style=\"text-align:right;\"><div style=\"font-size:18px;font-weight:800;color:" + azul + ";\">" + (parcial ? "INFORME PARCIAL" : "INFORME DE RESULTADOS") + "</div>" +
             "<div style=\"font-size:11px;font-weight:bold;\">" + esc(fechaTexto(d.fecha)) + "</div></div></div>";
         // Datos del paciente
         h += "<table style=\"width:100%;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;margin-bottom:16px;font-size:12px;\"><tr>" +
             "<td style=\"padding:10px 14px;vertical-align:top;line-height:1.7;\"><b>Paciente:</b> " + esc(d.paciente) + "<br><b>CI:</b> " + esc(d.ci || "-") + "<br><b>Edad / Sexo:</b> " + esc((d.edad || "-") + " / " + d.sexo) + "<br><b>Médico:</b> " + esc(d.medico) + "</td>" +
-            "<td style=\"padding:10px 14px;vertical-align:top;line-height:1.7;\"><b>N° de muestra:</b> " + esc(d.muestra) + "<br><b>Equipo:</b> " + esc(d.equipo) + "<br><b>Estado:</b> VALIDADO</td></tr></table>";
+            "<td style=\"padding:10px 14px;vertical-align:top;line-height:1.7;\"><b>N° de muestra:</b> " + esc(d.muestra) + "<br><b>Equipo:</b> " + esc(d.equipo) + "<br><b>Estado:</b> " + (parcial ? "PARCIAL (en proceso)" : "VALIDADO") + "</td></tr></table>";
+        if (parcial) h += "<div style=\"background:#FFFBEB;border:1px solid #FCD34D;color:#92400E;padding:8px 14px;border-radius:6px;margin-bottom:10px;font-size:11px;\"><b>⏳ Exámenes pendientes:</b> " + esc(pendientes.join(", ")) + ". Se agregarán al informe apenas estén validados.</div>";
         // Resultados por categoría
         const cats = Object.keys(d.grupos || {});
         if (cats.length === 0) h += "<p>No hay resultados analíticos disponibles.</p>";
