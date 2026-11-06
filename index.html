@@ -100,6 +100,9 @@
                 <div class="validacion-grid">
                     <div class="panel inbox-panel">
                         <div class="filter-controls"><button class="filter-btn active" id="btn-filtro-pendientes" onclick="cambiarFiltroBandeja('Pendientes')">📥 Pendientes</button><button class="filter-btn" id="btn-filtro-validados" onclick="cambiarFiltroBandeja('Validados')">🗄️ Validados</button><button class="filter-btn" id="btn-filtro-rechazados" onclick="cambiarFiltroBandeja('Rechazados')">🚫 Rechazados</button></div>
+                        <div class="busqueda-historial"><input type="text" id="buscar-historial" placeholder="🔍 Buscar antiguo: N° de tubo o CI" onkeydown="if(event.key==='Enter')buscarEnHistorial()"><button onclick="buscarEnHistorial()">Buscar</button></div>
+                        <div id="resultado-busqueda" class="resultado-busqueda"></div>
+                        <div id="info-ventana" class="info-ventana"></div>
                         <div class="patient-list" id="lista-pacientes"></div>
                     </div>
                     <div class="review-area">
@@ -238,6 +241,13 @@
                         <button class="btn-success-adm" style="margin-top:0; padding: 10px;" onclick="guardarPrueba()">Actualizar Precio</button>
                         <table class="history-table" style="margin-top: 20px;"><thead><tr><th>Prueba (ID)</th><th>Precio Base</th><th>Acción</th></tr></thead><tbody id="tabla-conf-pruebas"></tbody></table>
                     </div>
+                </div>
+
+                <!-- RENDIMIENTO -->
+                <div class="panel panel-blue" style="margin-top: 20px;">
+                    <h3 class="panel-title">⚡ Rendimiento</h3>
+                    <p style="font-size: 0.85rem; color: #666; margin-top: 0;">La bandeja carga solo los últimos días (más todo lo que falta validar). Lo antiguo se busca con el buscador de la bandeja. Menos días = la página abre más rápido y gasta menos cuota de Firebase.</p>
+                    <div style="display:flex; gap:10px; align-items:center;"><label for="conf-dias-ventana">Días a cargar en esta PC:</label><input type="number" id="conf-dias-ventana" min="1" max="365" style="width:90px;"><button class="action-btn" onclick="cambiarDiasVentana()">Guardar</button></div>
                 </div>
 
                 <!-- ENTREGA DE RESULTADOS -->
