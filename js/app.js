@@ -89,6 +89,7 @@ function switchView(viewId, element) {
     document.getElementById('view-' + viewId).classList.add('active');
     if (element) element.classList.add('active');
 
+    if (viewId === 'historial' && !document.getElementById('hist-desde').value) semanaHistorial();
     if (viewId === 'estadisticas') {
         const hoy = new Date();
         document.getElementById('filtro-fecha-inicio').value = fechaLocalISO(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
@@ -1396,3 +1397,118 @@ function enviarWebhook(codigo, item, hoyStr) {
         })
         .catch(e => { console.error(e); alert("⚠️ No se pudo enviar el auto-pedido de " + item.nombre + ".\nRevise la conexión o el escenario de Make.\n\nDetalle: " + e.message); });
 }
+
+
+// =====================================================================
+//  HISTORIAL DE RESULTADOS (módulo aparte, en forma de tabla)
+// =====================================================================
+let histFilas = [];
+window.semanaHistorial = function () {
+    const h = new Date(); document.getElementById('hist-hasta').value = fechaLocalISO(h);
+    document.getElementById('hist-desde').value = fechaLocalISO(new Date(h.getFullYear(), h.getMonth(), h.getDate() - 6));
+    document.getElementById('hist-paciente').value = ""; document.getElementById('hist-tubo').value = ""; document.getElementById('hist-estado').value = "";
+    buscarHistorialTabla();
+};
+function sinAcentos(t) { return String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase(); }
+function sumarDias(iso, n) { const d = new Date(iso + "T12:00:00"); d.setDate(d.getDate() + n); return fechaLocalISO(d); }
+window.buscarHistorialTabla = async function () {
+    const desde = document.getElementById('hist-desde').value, hasta = document.getElementById('hist-hasta').value;
+    const pac = document.getElementById('hist-paciente').value.trim(), tubo = document.getElementById('hist-tubo').value.trim();
+    const cuerpo = document.getElementById('hist-cuerpo'), resumen = document.getElementById('hist-resumen');
+    if (!tubo && !/^\d{4,}$/.test(pac) && (!desde || !hasta)) return alert("Elija las fechas Desde y Hasta");
+    if (/[.#$\[\]\/]/.test(tubo)) return alert("N° de tubo no válido");
+    cuerpo.innerHTML = "<tr><td colspan=\"7\" style=\"text-align:center; padding:20px; color:#888;\">⏳ Buscando en el historial...</td></tr>"; resumen.innerText = "";
+    try {
+        let ordenes = {};
+        if (tubo) {
+            const o = await db.ref("ordenes_pendientes/" + tubo).once("value"); if (o.exists()) ordenes[tubo] = o.val();
+        } else if (/^\d{4,}$/.test(pac)) {
+            // Es un CI: todas sus órdenes, sin importar la fecha
+            ordenes = (await db.ref("ordenes_pendientes").orderByChild("ci_paciente").equalTo(pac).once("value")).val() || {};
+        } else {
+            ordenes = (await db.ref("ordenes_pendientes").orderByChild("fecha_creacion").startAt(desde).endAt(hasta + "\uf8ff").once("value")).val() || {};
+        }
+        // Filtro por nombre (sin importar mayúsculas ni tildes)
+        if (pac && !/^\d{4,}$/.test(pac)) { const q = sinAcentos(pac); Object.keys(ordenes).forEach(k => { if (!sinAcentos(ordenes[k].nombre_paciente).includes(q)) delete ordenes[k]; }); }
+        // Resultados de esas órdenes
+        const porMuestra = {};
+        const agregar = (k, r) => { if (!r || !r.muestra) return; (porMuestra[r.muestra] = porMuestra[r.muestra] || {})[k] = r; };
+        const muestras = Object.keys(ordenes);
+        if (tubo || /^\d{4,}$/.test(pac) || muestras.length <= 30) {
+            await Promise.all(muestras.map(m => db.ref("resultados").orderByChild("muestra").equalTo(m).once("value").then(s => s.forEach(h => agregar(h.key, h.val())))));
+            if (tubo && !muestras.length) { // tubo sin orden web (huérfano)
+                const s = await db.ref("resultados").orderByChild("muestra").equalTo(tubo).once("value"); s.forEach(h => agregar(h.key, h.val()));
+                if (porMuestra[tubo]) ordenes[tubo] = null;
+            }
+        } else {
+            const rs = (await db.ref("resultados").orderByChild("fecha_recepcion").startAt(desde).endAt(sumarDias(hasta, 15) + "\uf8ff").once("value")).val() || {};
+            Object.keys(rs).forEach(k => agregar(k, rs[k]));
+        }
+        Object.keys(datosGlobales).forEach(k => { if (ordenes.hasOwnProperty(datosGlobales[k].muestra)) agregar(k, datosGlobales[k]); });
+        histFilas = Object.keys(ordenes).map(m => filaHistorial(m, ordenes[m], porMuestra[m] || {}));
+        histFilas.sort((a, b) => String(b.fechaISO).localeCompare(String(a.fechaISO)));
+        // Guardamos lo traído para poder abrirlo en Validación
+        Object.values(porMuestra).forEach(g => Object.keys(g).forEach(k => { resExtra[k] = g[k]; }));
+        Object.keys(ordenes).forEach(m => { if (ordenes[m]) ordenesExtra[m] = ordenes[m]; });
+        pintarHistorialTabla();
+    } catch (e) { cuerpo.innerHTML = "<tr><td colspan=\"7\" style=\"color:#DC2626; padding:15px;\">Error al buscar: " + esc(e.message) + "</td></tr>"; }
+};
+function filaHistorial(m, o, resultados) {
+    o = o || {}; const keys = Object.keys(resultados);
+    const pruebas = {}; // nombre -> estado
+    (o.examenes || []).forEach(n => pruebas[String(n).toUpperCase()] = "espera");
+    let rechazado = false, primeraKey = keys[0] || null, fechaRes = null;
+    keys.forEach(k => {
+        const r = resultados[k]; if (r.estado === "Rechazado") rechazado = true;
+        if (!fechaRes && r.fecha_recepcion) fechaRes = r.fecha_recepcion;
+        listaResultados(r).forEach(x => {
+            const n = x.n.toUpperCase(); const est = r.estado === "Rechazado" ? "rechazado" : (pruebaValidada(r, n) ? "validado" : "pendiente");
+            if (pruebas[n] !== "validado") pruebas[n] = est;
+        });
+        if (r.estado !== "Rechazado" && (!resultados[primeraKey] || resultados[primeraKey].estado === "Rechazado")) primeraKey = k;
+    });
+    const vals = Object.values(pruebas);
+    let estado = "Sin resultados";
+    if (keys.length) {
+        if (vals.length && vals.every(v => v === "validado")) estado = "Validado";
+        else if (rechazado && !vals.some(v => v === "validado" || v === "pendiente")) estado = "Rechazado";
+        else if (vals.some(v => v === "validado")) estado = "Parcial";
+        else estado = "Pendiente";
+    }
+    const fechaISO = o.fecha_creacion || fechaRes || "";
+    return { muestra: m, nombre: o.nombre_paciente || (keys.length ? nombreDeResultado(resultados[keys[0]]).nombre : "-"), ci: o.ci_paciente || "", fechaISO: fechaISO, pruebas: pruebas, estado: estado, key: primeraKey, medico: o.medico || "" };
+}
+window.pintarHistorialTabla = function () {
+    const filtro = document.getElementById('hist-estado').value;
+    const filas = histFilas.filter(f => !filtro || f.estado === filtro);
+    const cuerpo = document.getElementById('hist-cuerpo');
+    const cuenta = {}; histFilas.forEach(f => cuenta[f.estado] = (cuenta[f.estado] || 0) + 1);
+    document.getElementById('hist-resumen').innerHTML = "<b>" + histFilas.length + "</b> órdenes encontradas" + Object.keys(cuenta).map(k => " · " + esc(k) + ": <b>" + cuenta[k] + "</b>").join("");
+    if (!filas.length) { cuerpo.innerHTML = "<tr><td colspan=\"7\" style=\"text-align:center; padding:20px; color:#888;\">No hay órdenes con esos filtros.</td></tr>"; return; }
+    const icono = { validado: "✔", pendiente: "⏳", espera: "•", rechazado: "✖" };
+    const claseEstado = { "Validado": "val", "Rechazado": "rech", "Parcial": "parc", "Pendiente": "pend", "Sin resultados": "sinres" };
+    cuerpo.innerHTML = filas.map(f => {
+        const d = f.fechaISO ? new Date(f.fechaISO) : null;
+        const chips = Object.keys(f.pruebas).map(n => "<span class=\"chip-prueba " + f.pruebas[n] + "\" title=\"" + esc(f.pruebas[n]) + "\">" + icono[f.pruebas[n]] + " " + esc(n) + "</span>").join(" ");
+        const abrir = f.key ? "<button class=\"btn-abrir-hist\" onclick=\"abrirDesdeHistorial(" + jsArg(f.key) + ")\">Abrir</button>" : "";
+        return "<tr><td>" + (d && !isNaN(d) ? esc(d.toLocaleDateString()) + "<br><small>" + esc(d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })) + "</small>" : "-") + "</td><td><b>" + esc(f.muestra) + "</b></td><td>" + esc(f.nombre) + "</td><td>" + esc(f.ci) + "</td><td>" + chips + "</td><td><span class=\"status-pill " + claseEstado[f.estado] + "\">" + esc(f.estado) + "</span></td><td>" + abrir + "</td></tr>";
+    }).join("");
+};
+window.abrirDesdeHistorial = function (key) {
+    seguirResultado(key); aplicarDatos();
+    switchView('validacion', document.querySelectorAll('.nav-item')[1]);
+    if (window.abrirEncontrado) abrirEncontrado(key);
+};
+window.exportarHistorialCSV = function () {
+    if (!histFilas.length) return alert("Primero haga una búsqueda");
+    const filtro = document.getElementById('hist-estado').value;
+    const q = v => '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
+    const lineas = [["Fecha", "Tubo", "Paciente", "CI", "Medico", "Pruebas", "Estado"].map(q).join(";")];
+    histFilas.filter(f => !filtro || f.estado === filtro).forEach(f => {
+        const d = f.fechaISO ? new Date(f.fechaISO) : null;
+        lineas.push([d && !isNaN(d) ? d.toLocaleString() : "", f.muestra, f.nombre, f.ci, f.medico, Object.keys(f.pruebas).map(n => n + "(" + f.pruebas[n] + ")").join(" "), f.estado].map(q).join(";"));
+    });
+    const blob = new Blob(["\ufeff" + lineas.join("\r\n")], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "historial_" + document.getElementById('hist-desde').value + "_" + document.getElementById('hist-hasta').value + ".csv";
+    document.body.appendChild(a); a.click(); a.remove();
+};
