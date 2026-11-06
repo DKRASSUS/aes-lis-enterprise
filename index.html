@@ -46,6 +46,7 @@
         <nav class="side-nav">
             <div class="nav-item active" onclick="switchView('admision', this)">🏥 Admisión y Órdenes</div>
             <div class="nav-item" onclick="switchView('validacion', this)">🔬 Validación Médica</div>
+            <div class="nav-item" onclick="switchView('historial', this)">📋 Historial</div>
             <div class="nav-item" onclick="switchView('estadisticas', this)">📊 Estadísticas</div>
             <div class="nav-item" onclick="switchView('inventario', this)">📦 Inventario</div>
             <div class="nav-item" onclick="switchView('configuracion', this)" style="margin-top: 20px; border-top: 1px solid var(--border-color);">⚙️ Configuración</div>
@@ -131,6 +132,24 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- VISTA: HISTORIAL DE RESULTADOS -->
+            <div id="view-historial" class="view-section">
+                <div class="panel panel-blue">
+                    <h3 class="panel-title">📋 Historial de Resultados</h3>
+                    <p style="font-size:0.85rem; color:#666; margin-top:0;">Por defecto muestra la última semana. Cambie las fechas o escriba un nombre, CI o tubo y presione <b>Buscar</b> para traer más del historial.</p>
+                    <div class="hist-filtros">
+                        <div><label>Desde</label><input type="date" id="hist-desde"></div>
+                        <div><label>Hasta</label><input type="date" id="hist-hasta"></div>
+                        <div class="hist-ancho"><label>Paciente (nombre o CI)</label><input type="text" id="hist-paciente" placeholder="Ej: Mariela o 6144748" onkeydown="if(event.key==='Enter')buscarHistorialTabla()"></div>
+                        <div><label>N° de tubo</label><input type="text" id="hist-tubo" placeholder="Ej: 2611064650" onkeydown="if(event.key==='Enter')buscarHistorialTabla()"></div>
+                        <div><label>Estado</label><select id="hist-estado" onchange="pintarHistorialTabla()"><option value="">Todos</option><option>Sin resultados</option><option>Pendiente</option><option>Parcial</option><option>Validado</option><option>Rechazado</option></select></div>
+                        <div class="hist-botones"><button class="action-btn btn-validate-pdf" onclick="buscarHistorialTabla()">🔍 Buscar</button><button class="action-btn" onclick="semanaHistorial()">Esta semana</button><button class="action-btn" onclick="exportarHistorialCSV()">⬇ Excel (CSV)</button></div>
+                    </div>
+                    <div id="hist-resumen" class="hist-resumen"></div>
+                    <div class="hist-tabla-caja"><table class="results-table hist-tabla"><thead><tr><th>Fecha</th><th>Tubo</th><th>Paciente</th><th>CI</th><th>Pruebas</th><th>Estado</th><th></th></tr></thead><tbody id="hist-cuerpo"></tbody></table></div>
                 </div>
             </div>
 
