@@ -109,7 +109,10 @@ function iniciarListeners() {
             configPrecios = data.precios || {};
             configReferencias = data.referencias || {};
             configLab = data.laboratorio || { nombre: "Laboratorio Clínico", telefono: "", direccion: "" };
-            renderizarConfiguracion(); actualizarSelectSeguros(); renderizarReferencias();
+            configEntrega = data.entrega || { auto_correo: false };
+            renderizarConfiguracion(); actualizarSelectSeguros(); renderizarReferencias(); renderizarConfigEntrega();
+            // Copia pública (solo nombre y contacto) para el encabezado del portal del paciente
+            db.ref("portal_publico/laboratorio").set({ nombre: configLab.nombre || "", telefono: configLab.telefono || "", direccion: configLab.direccion || "" }).catch(() => { });
         } else {
             db.ref("configuracion").set({ seguros: { "Particular": 0 }, precios: { "GLU": 25 }, laboratorio: configLab });
         }
@@ -153,6 +156,7 @@ function guardarPerfilLab() {
     const d = document.getElementById('conf-lab-direccion').value.trim();
     if (!n) return alert("El nombre del laboratorio es obligatorio.");
     db.ref("configuracion/laboratorio").set({ nombre: n, telefono: t, direccion: d });
+    db.ref("portal_publico/laboratorio").set({ nombre: n, telefono: t, direccion: d });
     mostrarToast("Perfil Actualizado", "Datos del laboratorio guardados.");
 }
 
@@ -333,10 +337,12 @@ function buscarPaciente() {
             document.getElementById('nombre').value = p.nombre || "";
             document.getElementById('fecha_nac').value = p.fecha_nac || "";
             document.getElementById('genero').value = p.genero || "M";
+            document.getElementById('celular').value = p.celular || "";
+            document.getElementById('correo').value = p.correo || "";
             buscarHistorial(ci);
         } else {
             mostrarToast("Paciente nuevo", "No existe el CI " + ci + ". Complete sus datos.");
-            document.getElementById('nombre').value = ""; document.getElementById('fecha_nac').value = "";
+            ['nombre', 'fecha_nac', 'celular', 'correo'].forEach(c => document.getElementById(c).value = "");
             document.getElementById('panel-historial').style.display = "none";
         }
     }).catch(e => alert("Error al buscar: " + e.message));
@@ -405,7 +411,11 @@ async function generarOrden() {
     btn.disabled = true; const txt = btn.innerHTML; btn.innerHTML = "⏳ Generando...";
     try {
         const fechaNac = document.getElementById('fecha_nac').value; const genero = document.getElementById('genero').value;
-        await db.ref("pacientes/" + ci).set({ nombre: nombre, fecha_nac: fechaNac, genero: genero, ultima_visita: new Date().toISOString() });
+        const celular = document.getElementById('celular').value.trim(); const correo = document.getElementById('correo').value.trim();
+        if (correo && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(correo)) throw new Error("El correo del paciente no es válido.");
+        // update (no set) para no borrar el acceso al portal del paciente
+        await db.ref("pacientes/" + ci).update({ nombre: nombre, fecha_nac: fechaNac, genero: genero, celular: celular, correo: correo, ultima_visita: new Date().toISOString() });
+        const acceso = await asegurarAccesoPortal(ci);
 
         const examenesArray = Array.from(pruebasSeleccionadas);
         const idMuestra = await generarIdMuestraUnico();
@@ -415,14 +425,14 @@ async function generarOrden() {
         const detallePrecios = {}; examenesArray.forEach(id => detallePrecios[id] = precioDe(id));
 
         await db.ref("ordenes_pendientes/" + idMuestra).set({
-            id_muestra: idMuestra, ci_paciente: ci, nombre_paciente: nombre, fecha_nac: fechaNac, genero: genero,
+            id_muestra: idMuestra, ci_paciente: ci, nombre_paciente: nombre, fecha_nac: fechaNac, genero: genero, celular: celular, correo: correo,
             medico: document.getElementById('medico').value.trim(), prioridad: document.getElementById('prioridad').value,
             examenes: examenesArray, precios: detallePrecios, seguro: seguroTexto,
             subtotal: t.subtotal, descuento: t.descuento, total: t.total, total_cobrado: t.total.toFixed(2) + " Bs",
             estado: "Pendiente", fecha_creacion: new Date().toISOString(), creado_por: usuarioActual()
         });
 
-        document.getElementById('lbl-paciente-etiqueta').innerHTML = esc(nombre) + " | CI: " + esc(ci) + "<br>Seguro: " + esc(seguroTexto) + " | Total: " + t.total.toFixed(2) + " Bs<br>Exámenes: " + esc(examenesArray.join(", ")) + "<br><br><span style=\"font-size: 1.1rem; color: var(--aes-dark);\">ID de Tubo: <strong>" + idMuestra + "</strong></span><button onclick=\"copiarIDMuestra('" + idMuestra + "')\" style=\"background:none; border:none; cursor:pointer; font-size:1.4rem; color:var(--aes-blue); margin-left: 5px; vertical-align: middle;\" title=\"Copiar ID\">📋</button>";
+        document.getElementById('lbl-paciente-etiqueta').innerHTML = esc(nombre) + " | CI: " + esc(ci) + "<br>Seguro: " + esc(seguroTexto) + " | Total: " + t.total.toFixed(2) + " Bs<br>Exámenes: " + esc(examenesArray.join(", ")) + "<br><br><span style=\"font-size: 1.1rem; color: var(--aes-dark);\">ID de Tubo: <strong>" + idMuestra + "</strong></span><button onclick=\"copiarIDMuestra('" + idMuestra + "')\" style=\"background:none; border:none; cursor:pointer; font-size:1.4rem; color:var(--aes-blue); margin-left: 5px; vertical-align: middle;\" title=\"Copiar ID\">📋</button><br><span style=\"font-size:0.85rem;color:var(--aes-purple);\">🌐 Código del portal del paciente: <b style=\"letter-spacing:2px;\">" + acceso.pin + "</b></span>";
         document.getElementById('barcode-panel').style.display = "block";
         JsBarcode("#barcode", idMuestra, { format: "CODE128", width: 2, height: 50, displayValue: true, fontSize: 16, fontOptions: "bold" });
         pruebasSeleccionadas.clear(); preciosModificados = {}; actualizarCotizacion(); document.getElementById('medico').value = ""; buscarHistorial(ci);
@@ -541,6 +551,29 @@ function renderizarBandeja() {
     lista.innerHTML = n === 0 ? "<div style=\"padding: 30px; text-align: center; color: #888;\">No hay informes aquí.</div>" : h;
 }
 
+// ---------- Datos del informe (los usan pantalla, PDF y portal) ----------
+function datosInforme(key) {
+    const r = datosGlobales[key]; if (!r) return null;
+    const info = nombreDeResultado(r); const o = info.orden;
+    const genero = o ? o.genero : undefined;
+    const grupos = {}; let anormales = 0;
+    listaResultados(r).forEach(x => {
+        const ref = resolverReferencia(x.n, genero, x.refEq);
+        const flag = calcularFlag(x.v, ref);
+        if (flag) anormales++;
+        const cat = categoriaDe(x.n);
+        (grupos[cat] = grupos[cat] || []).push({ n: x.n, v: x.v, u: x.u || ref.unidad, ref: ref.texto, flag: flag });
+    });
+    return {
+        lab: { nombre: configLab.nombre || "Laboratorio Clínico", direccion: configLab.direccion || "", telefono: configLab.telefono || "" },
+        paciente: info.nombre, huerfano: info.huerfano, ci: o ? o.ci_paciente : (r.ci || ""),
+        edad: calcularEdad(o ? o.fecha_nac : ""), sexo: genero === "F" ? "Femenino" : (genero === "M" ? "Masculino" : "-"),
+        medico: (o && o.medico) ? o.medico : "-", muestra: r.muestra || "N/A", equipo: r.equipo || "N/A",
+        fecha: r.fecha_validacion || null, validado_por: r.validado_por || "",
+        grupos: grupos, anormales: anormales, examenes_web: (o && o.examenes) ? o.examenes : []
+    };
+}
+
 function mostrarDetalle(key) {
     const r = datosGlobales[key]; if (!r) return;
     pacienteSeleccionadoId = key;
@@ -550,63 +583,33 @@ function mostrarDetalle(key) {
     document.getElementById("estado-vacio").style.display = "none"; document.getElementById("contenedor-resultados").style.display = "block";
 
     const bp = document.getElementById('botones-pendientes'), bv = document.getElementById('botones-validados'), br = document.getElementById('botones-rechazados'), badge = document.getElementById('badge-estado-visor');
-    bp.style.display = bv.style.display = br.style.display = "none";
-    if (estado === "Validado_Final") { bv.style.display = "flex"; badge.innerText = "✔ VALIDADO"; }
+    const pe = document.getElementById('panel-entrega');
+    bp.style.display = bv.style.display = br.style.display = pe.style.display = "none";
+    if (estado === "Validado_Final") { bv.style.display = "flex"; pe.style.display = "block"; badge.innerText = "✔ VALIDADO"; }
     else if (estado === "Rechazado") { br.style.display = "flex"; badge.innerText = "✖ RECHAZADO"; }
     else { bp.style.display = "flex"; badge.innerText = "Pendiente Firma"; }
 
-    const info = nombreDeResultado(r); const o = info.orden;
-    const genero = o ? o.genero : undefined;
-    const fechaNac = o ? o.fecha_nac : "";
-    const generoTxt = genero === "F" ? "Femenino" : (genero === "M" ? "Masculino" : "-");
-    const nombreMostrar = info.huerfano ? info.nombre + " (sin orden web)" : info.nombre;
+    const d = datosInforme(key);
+    document.getElementById("detalle-nombre").innerText = d.huerfano ? d.paciente + " (sin orden web)" : d.paciente;
+    document.getElementById("detalle-muestra").innerText = d.muestra;
+    document.getElementById("detalle-equipo").innerText = d.equipo;
 
-    document.getElementById("detalle-nombre").innerText = nombreMostrar;
-    document.getElementById("detalle-muestra").innerText = r.muestra || "N/A";
-    document.getElementById("detalle-equipo").innerText = r.equipo || "Analizador LIS";
-
-    // Datos del PDF
-    document.getElementById("pdf-paciente").innerText = info.nombre;
-    document.getElementById("pdf-ci").innerText = o ? o.ci_paciente : (r.ci || "-");
-    document.getElementById("pdf-edad-sexo").innerText = (calcularEdad(fechaNac) || "-") + " / " + generoTxt;
-    document.getElementById("pdf-medico").innerText = (o && o.medico) ? o.medico : "-";
-    document.getElementById("pdf-orden").innerText = r.muestra || "N/A";
-    document.getElementById("pdf-equipo").innerText = r.equipo || "N/A";
-    document.getElementById("pdf-fecha").innerText = r.fecha_validacion ? new Date(r.fecha_validacion).toLocaleString() : new Date().toLocaleString();
-    document.getElementById("pdf-validado-por").innerText = r.validado_por || usuarioActual();
-
-    const tablaLIS = document.getElementById("tabla-analitos"); const contPDF = document.getElementById("pdf-resultados-dinamicos");
-    let hT = "", hP = "";
+    let hT = "";
     if (r.estado === "Rechazado") hT += "<tr><td colspan=\"4\" class=\"aviso-rechazo\"><strong>Motivo de rechazo:</strong> " + esc(r.motivo_rechazo || "-") + " — " + esc(r.rechazado_por || "") + "</td></tr>";
-    if (!info.huerfano) hT += "<tr><td colspan=\"4\" style=\"background: #FFFBEB; padding: 10px; color: #B45309; font-size: 0.8rem;\"><strong>Pruebas solicitadas en Web:</strong> " + esc(o.examenes ? o.examenes.join(", ") : "") + "</td></tr>";
-
-    const res = listaResultados(r);
-    if (res.length > 0) {
-        const porCat = {};
-        res.forEach(x => {
-            const ref = resolverReferencia(x.n, genero, x.refEq);
-            const flag = calcularFlag(x.v, ref);
-            const cat = categoriaDe(x.n); (porCat[cat] = porCat[cat] || []).push({ n: x.n, v: x.v, u: x.u || ref.unidad, ref: ref.texto, flag: flag });
+    if (d.anormales > 0) hT += "<tr><td colspan=\"4\" class=\"aviso-anormal\">⚠️ " + d.anormales + " resultado(s) fuera del rango de referencia</td></tr>";
+    if (!d.huerfano) hT += "<tr><td colspan=\"4\" style=\"background: #FFFBEB; padding: 10px; color: #B45309; font-size: 0.8rem;\"><strong>Pruebas solicitadas en Web:</strong> " + esc(d.examenes_web.join(", ")) + "</td></tr>";
+    const cats = Object.keys(d.grupos);
+    if (cats.length === 0) hT += "<tr><td colspan=\"4\" style=\"text-align: center; padding: 20px;\">Sin resultados</td></tr>";
+    cats.forEach(cat => {
+        hT += "<tr style=\"background: #F3E8FF;\"><td colspan=\"4\" style=\"padding: 10px 20px; font-weight: 800; color: var(--aes-purple); font-size: 0.85rem;\">🏷️ " + esc(cat) + "</td></tr>";
+        d.grupos[cat].forEach(x => {
+            const flagHtml = x.flag === "H" ? " <span class=\"flag flag-h\">▲ H</span>" : (x.flag === "L" ? " <span class=\"flag flag-l\">▼ L</span>" : "");
+            hT += "<tr class=\"" + (x.flag ? "fila-anormal" : "") + "\"><td style=\"padding-left: 35px;\"><strong>" + esc(x.n) + "</strong></td><td style=\"font-family: monospace; font-size:1.1rem;\">" + esc(x.v) + flagHtml + "</td><td><span class=\"unit-badge\">" + esc(x.u || '-') + "</span></td><td style=\"color:#64748B; font-size:0.85rem;\">" + esc(x.ref) + "</td></tr>";
         });
-        let anormales = 0;
-        Object.keys(porCat).forEach(cat => {
-            hT += "<tr style=\"background: #F3E8FF;\"><td colspan=\"4\" style=\"padding: 10px 20px; font-weight: 800; color: var(--aes-purple); font-size: 0.85rem;\">🏷️ " + esc(cat) + "</td></tr>";
-            hP += "<div class=\"pdf-banda-color\">" + esc(cat) + "</div><table class=\"pdf-table\"><thead><tr><th style=\"width:30%;\">EXAMEN</th><th style=\"width:20%;\">RESULTADO</th><th style=\"width:20%;\">UNIDAD</th><th style=\"width:30%;\">VALOR DE REFERENCIA</th></tr></thead><tbody>";
-            porCat[cat].forEach(x => {
-                if (x.flag) anormales++;
-                const flagHtml = x.flag === "H" ? " <span class=\"flag flag-h\">▲ H</span>" : (x.flag === "L" ? " <span class=\"flag flag-l\">▼ L</span>" : "");
-                hT += "<tr class=\"" + (x.flag ? "fila-anormal" : "") + "\"><td style=\"padding-left: 35px;\"><strong>" + esc(x.n) + "</strong></td><td style=\"font-family: monospace; font-size:1.1rem;\">" + esc(x.v) + flagHtml + "</td><td><span class=\"unit-badge\">" + esc(x.u || '-') + "</span></td><td style=\"color:#64748B; font-size:0.85rem;\">" + esc(x.ref) + "</td></tr>";
-                const pdfFlag = x.flag ? " <b style=\"color:#DC2626;\">" + (x.flag === "H" ? "▲ H" : "▼ L") + "</b>" : "";
-                hP += "<tr><td><b>" + esc(x.n) + "</b></td><td style=\"font-family:monospace; font-size:13px; font-weight:bold;" + (x.flag ? " color:#DC2626;" : "") + "\">" + esc(x.v) + pdfFlag + "</td><td style=\"color:#666;\">" + esc(x.u || '-') + "</td><td style=\"color:#888; font-size:11px;\">" + esc(x.ref) + "</td></tr>";
-            });
-            hP += "</tbody></table>";
-        });
-        if (anormales > 0) hT = "<tr><td colspan=\"4\" class=\"aviso-anormal\">⚠️ " + anormales + " resultado(s) fuera del rango de referencia</td></tr>" + hT;
-    } else {
-        hT += "<tr><td colspan=\"4\" style=\"text-align: center; padding: 20px;\">Sin resultados</td></tr>"; hP = "<p>No hay resultados analíticos disponibles.</p>";
-    }
-    tablaLIS.innerHTML = hT; contPDF.innerHTML = hP;
+    });
+    document.getElementById("tabla-analitos").innerHTML = hT;
     renderizarAuditoria(r);
+    if (estado === "Validado_Final") renderizarEntrega(key);
 }
 
 function renderizarAuditoria(r) {
@@ -619,28 +622,62 @@ function renderizarAuditoria(r) {
     cont.innerHTML = items.map(a => "<div class=\"audit-item\"><span class=\"audit-fecha\">" + esc(new Date(a.fecha).toLocaleString()) + "</span> <strong>" + esc(a.accion) + "</strong> — " + esc(a.usuario) + (a.detalle ? " <em>(" + esc(a.detalle) + ")</em>" : "") + "</div>").join("");
 }
 
-function descargarSoloPDF(forzarValidacion) {
+// ---------- PDF ----------
+function qrDataURL(texto) {
+    try {
+        if (!window.QRCode || !texto) return "";
+        const div = document.createElement("div");
+        new QRCode(div, { text: texto, width: 120, height: 120, correctLevel: QRCode.CorrectLevel.M });
+        const c = div.querySelector("canvas");
+        return c ? c.toDataURL("image/png") : "";
+    } catch (e) { return ""; }
+}
+async function prepararPlantillaPDF(key, forzarValidacion) {
+    const d = datosInforme(key);
+    if (forzarValidacion) { d.fecha = new Date().toISOString(); d.validado_por = usuarioActual(); }
+    let extra = {};
+    if (!d.huerfano && d.ci) {
+        try {
+            const acc = await asegurarAccesoPortal(d.ci);
+            const url = urlPortal(acc.token);
+            extra = { qr: qrDataURL(url), portal: urlPortal(), pin: acc.pin };
+        } catch (e) { console.warn("Sin datos de portal para el PDF:", e); }
+    }
+    document.getElementById('plantilla-pdf').innerHTML = AESInforme.html(d, extra);
+    return d;
+}
+function opcionesPDF(d) {
+    return { margin: 10, filename: "Informe_" + String(d.paciente).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9]+/g, '_') + "_" + d.muestra + ".pdf", image: { type: 'jpeg', quality: 0.95 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }, pagebreak: { mode: ['avoid-all', 'css', 'legacy'] } };
+}
+function conPlantillaVisible(fn) {
+    const pw = document.getElementById('pdf-container');
+    pw.style.display = 'block'; pw.style.position = 'absolute'; pw.style.left = '-10000px'; pw.style.top = '0';
+    return Promise.resolve().then(fn).finally(() => { pw.style.display = 'none'; });
+}
+
+async function descargarSoloPDF(forzarValidacion) {
     const btn = document.querySelector(forzarValidacion ? '.btn-validate-pdf' : '.btn-reprint'); const tOriginal = btn.innerHTML; btn.innerHTML = "⏳ Generando..."; btn.disabled = true;
     const idActual = pacienteSeleccionadoId;
-    if (forzarValidacion) {
-        document.getElementById("pdf-validado-por").innerText = usuarioActual();
-        document.getElementById("pdf-fecha").innerText = new Date().toLocaleString();
-    }
-    const pw = document.getElementById('pdf-container'); const ep = document.getElementById('plantilla-pdf');
-    pw.style.display = 'block'; pw.style.position = 'absolute'; pw.style.zIndex = '-100';
-    const fn = "Informe_AES_" + document.getElementById('pdf-paciente').innerText.replace(/\s+/g, '_') + "_" + document.getElementById('pdf-orden').innerText + ".pdf";
-    const opt = { margin: 10, filename: fn, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }, pagebreak: { mode: ['avoid-all', 'css', 'legacy'] } };
-    html2pdf().set(opt).from(ep).save().then(() => {
-        pw.style.display = 'none'; btn.innerHTML = tOriginal; btn.disabled = false;
+    try {
+        const d = await prepararPlantillaPDF(idActual, forzarValidacion);
+        await conPlantillaVisible(() => html2pdf().set(opcionesPDF(d)).from(document.getElementById('plantilla-pdf')).save());
         if (forzarValidacion) {
-            const ahora = new Date().toISOString();
-            db.ref("resultados/" + idActual).update({ estado: "Validado_Final", fecha_validacion: ahora, validado_por: usuarioActual() })
-                .then(() => registrarAuditoria(idActual, "Validado y liberado"))
-                .then(() => cambiarFiltroBandeja('Validados'));
+            await db.ref("resultados/" + idActual).update({ estado: "Validado_Final", fecha_validacion: d.fecha, validado_por: d.validado_por });
+            await registrarAuditoria(idActual, "Validado y liberado");
+            await publicarEnPortal(idActual);
+            if (configEntrega.auto_correo) {
+                const contacto = await contactoDe(idActual);
+                if (contacto.correo) enviarCorreoResultados(idActual, true);
+            }
+            cambiarFiltroBandeja('Validados');
         } else {
             registrarAuditoria(idActual, "Re-impresión de informe");
         }
-    }).catch(e => { pw.style.display = 'none'; btn.innerHTML = tOriginal; btn.disabled = false; alert("Error al generar PDF: " + e); });
+    } catch (e) {
+        alert("Error al generar el PDF: " + e);
+    } finally {
+        btn.innerHTML = tOriginal; btn.disabled = false;
+    }
 }
 function validarYGenerarPDF() { if (pacienteSeleccionadoId && confirm("¿Liberar reporte médico?")) descargarSoloPDF(true); }
 
@@ -651,6 +688,7 @@ function revertirValidacion() {
     const id = pacienteSeleccionadoId;
     db.ref("resultados/" + id).update({ estado: "Pendiente Validacion", fecha_validacion: null, validado_por: null })
         .then(() => registrarAuditoria(id, "Validación revertida", motivo.trim()))
+        .then(() => despublicarDePortal(id))
         .then(() => cambiarFiltroBandeja('Pendientes'));
 }
 // Rechazar ya NO borra: marca como Rechazado y guarda motivo y usuario
@@ -674,9 +712,185 @@ function borrarRegistroLIS(event, key) {
     event.stopPropagation();
     const r = datosGlobales[key]; if (!r) return;
     if (!confirm("¿ELIMINAR permanentemente el tubo " + (r.muestra || key) + "? Esto no se puede deshacer.")) return;
-    // Queda constancia de la eliminación en un registro global
     db.ref("auditoria_eliminaciones").push({ muestra: r.muestra || "", paciente: nombreDeResultado(r).nombre, motivo_rechazo: r.motivo_rechazo || "", usuario: usuarioActual(), fecha: new Date().toISOString() })
         .then(() => db.ref("resultados/" + key).remove());
+}
+
+// =====================================================================
+//  ENTREGA DE RESULTADOS: PORTAL, WHATSAPP Y CORREO
+// =====================================================================
+let configEntrega = { auto_correo: false };
+const ALFABETO_PIN = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // sin 0/O, 1/I/L para no confundir
+function aleatorio(n, alfabeto) { const a = new Uint32Array(n); crypto.getRandomValues(a); return Array.from(a, x => alfabeto[x % alfabeto.length]).join(""); }
+
+function urlPortal(token) {
+    const base = location.href.split("#")[0].split("?")[0].replace(/[^/]*$/, "");
+    return base + "portal.html" + (token ? "?t=" + token : "");
+}
+
+// Cada paciente tiene UN enlace (token) y UN código de 6 caracteres para el portal
+async function asegurarAccesoPortal(ci) {
+    if (!ci || !claveValida(ci)) throw new Error("CI inválido");
+    const ref = db.ref("pacientes/" + ci);
+    const p = (await ref.once("value")).val() || {};
+    if (p.portal_token && p.portal_pin) return { token: p.portal_token, pin: p.portal_pin };
+    const token = aleatorio(24, "abcdefghijkmnpqrstuvwxyz23456789"), pin = aleatorio(6, ALFABETO_PIN);
+    await ref.update({ portal_token: token, portal_pin: pin });
+    await db.ref("portal_indice/" + await AESInforme.indiceDe(ci, pin)).set(token);
+    return { token: token, pin: pin };
+}
+
+async function publicarEnPortal(key) {
+    const d = datosInforme(key);
+    if (!d || d.huerfano || !d.ci) { mostrarToast("Portal", "No se publicó: el resultado no tiene orden web con CI."); return false; }
+    try {
+        const acc = await asegurarAccesoPortal(d.ci);
+        const r = datosGlobales[key] || {};
+        d.fecha = r.fecha_validacion || d.fecha || new Date().toISOString();
+        d.validado_por = r.validado_por || d.validado_por || usuarioActual();
+        const paquete = await AESInforme.cifrar(d, acc.pin, acc.token);
+        await db.ref("portal/" + acc.token + "/informes/" + key).set({ fecha: d.fecha, iv: paquete.iv, datos: paquete.datos });
+        await db.ref("resultados/" + key + "/entregas/portal").set(new Date().toISOString());
+        await registrarAuditoria(key, "Publicado en el portal del paciente");
+        return true;
+    } catch (e) {
+        console.error(e); mostrarToast("Portal", "No se pudo publicar en el portal: " + e.message); return false;
+    }
+}
+async function despublicarDePortal(key) {
+    const d = datosInforme(key); if (!d || !d.ci) return;
+    const p = (await db.ref("pacientes/" + d.ci).once("value")).val() || {};
+    if (p.portal_token) {
+        await db.ref("portal/" + p.portal_token + "/informes/" + key).remove();
+        await db.ref("resultados/" + key + "/entregas/portal").remove();
+        await registrarAuditoria(key, "Retirado del portal del paciente");
+    }
+}
+
+async function contactoDe(key) {
+    const d = datosInforme(key); const o = (nombreDeResultado(datosGlobales[key]) || {}).orden || {};
+    let celular = o.celular || "", correo = o.correo || "";
+    if (d.ci && (!celular || !correo)) {
+        const p = (await db.ref("pacientes/" + d.ci).once("value")).val() || {};
+        celular = celular || p.celular || ""; correo = correo || p.correo || "";
+    }
+    return { ci: d.ci, celular: celular, correo: correo };
+}
+function normalizarCelular(t) {
+    let n = String(t || "").replace(/\D/g, "");
+    if (n.length === 8) n = "591" + n;           // número boliviano sin código de país
+    return n;
+}
+
+async function renderizarEntrega(key) {
+    const cont = document.getElementById("estado-entrega"); if (!cont) return;
+    const r = datosGlobales[key] || {}; const e = r.entregas || {};
+    const f = x => x ? "✔ " + new Date(x).toLocaleString() : "—";
+    const c = await contactoDe(key);
+    if (pacienteSeleccionadoId !== key) return;
+    cont.innerHTML = "<div class=\"entrega-fila\"><span>🌐 Portal</span><b>" + f(e.portal) + "</b></div>" +
+        "<div class=\"entrega-fila\"><span>📱 WhatsApp " + esc(c.celular ? "(+" + normalizarCelular(c.celular) + ")" : "(sin número)") + "</span><b>" + f(e.whatsapp) + "</b></div>" +
+        "<div class=\"entrega-fila\"><span>✉️ Correo " + esc(c.correo ? "(" + c.correo + ")" : "(sin correo)") + "</span><b>" + f(e.correo) + "</b></div>";
+}
+
+async function pedirDato(ci, campo, texto, validar) {
+    const v = prompt(texto);
+    if (!v || !v.trim()) return "";
+    if (validar && !validar(v.trim())) { alert("El dato ingresado no es válido."); return ""; }
+    if (ci) await db.ref("pacientes/" + ci + "/" + campo).set(v.trim());
+    return v.trim();
+}
+
+async function enviarWhatsApp() {
+    const key = pacienteSeleccionadoId; if (!key) return;
+    const c = await contactoDe(key);
+    if (!c.ci) return alert("Este resultado no tiene orden web con CI: no se puede generar el acceso al portal.");
+    let cel = c.celular || await pedirDato(c.ci, "celular", "📱 Número de WhatsApp del paciente (Ej: 70012345):", v => normalizarCelular(v).length >= 10);
+    if (!cel) return;
+    if (!datosGlobales[key].entregas || !datosGlobales[key].entregas.portal) await publicarEnPortal(key);
+    const acc = await asegurarAccesoPortal(c.ci);
+    const d = datosInforme(key);
+    const texto = "Hola " + d.paciente + " 👋\n\nSus resultados de *" + d.lab.nombre + "* ya están listos ✅\n\n" +
+        "Véalos y descárguelos aquí:\n" + urlPortal(acc.token) + "\n\nCódigo de acceso: *" + acc.pin + "*\n\n" +
+        (d.lab.telefono ? "Consultas: " + d.lab.telefono + "\n" : "") + "Gracias por su confianza.";
+    window.open("https://wa.me/" + normalizarCelular(cel) + "?text=" + encodeURIComponent(texto), "_blank");
+    await db.ref("resultados/" + key + "/entregas/whatsapp").set(new Date().toISOString());
+    await registrarAuditoria(key, "Enviado por WhatsApp", "+" + normalizarCelular(cel));
+    renderizarEntrega(key);
+}
+
+async function enviarCorreoResultados(keyParam, automatico) {
+    const key = keyParam || pacienteSeleccionadoId; if (!key) return;
+    const c = await contactoDe(key);
+    if (!c.ci) { if (!automatico) alert("Este resultado no tiene orden web con CI."); return; }
+    let correo = c.correo || (automatico ? "" : await pedirDato(c.ci, "correo", "✉️ Correo del paciente:", v => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)));
+    if (!correo) return;
+    if (!automatico) mostrarToast("Correo", "Preparando el PDF y enviando a " + correo + "...");
+    try {
+        if (!datosGlobales[key].entregas || !datosGlobales[key].entregas.portal) await publicarEnPortal(key);
+        const acc = await asegurarAccesoPortal(c.ci);
+        const d = await prepararPlantillaPDF(key, false);
+        const opt = opcionesPDF(d);
+        const uri = await conPlantillaVisible(() => html2pdf().set(opt).from(document.getElementById('plantilla-pdf')).outputPdf('datauristring'));
+        const pdf64 = String(uri).split(",").pop();
+        const enlace = urlPortal(acc.token);
+        const html = "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#333;max-width:600px;\">" +
+            "<div style=\"background:#1A1A24;color:#fff;padding:16px 20px;border-radius:6px 6px 0 0;\"><b style=\"font-size:17px;\">Sus resultados están listos</b><br><span style=\"color:#00A8E8;\">" + esc(d.lab.nombre) + "</span></div>" +
+            "<div style=\"border:1px solid #E2E8F0;border-top:none;padding:20px;border-radius:0 0 6px 6px;\">" +
+            "<p>Estimado/a <b>" + esc(d.paciente) + "</b>:</p><p>Le informamos que los resultados de su muestra <b>" + esc(d.muestra) + "</b> ya fueron validados. Le adjuntamos el informe en PDF.</p>" +
+            "<p>También puede verlos y descargarlos cuando quiera desde su portal:</p>" +
+            "<p style=\"text-align:center;margin:22px 0;\"><a href=\"" + enlace + "\" style=\"background:#00A8E8;color:#fff;text-decoration:none;padding:12px 26px;border-radius:6px;font-weight:bold;\">Ver mis resultados</a></p>" +
+            "<p style=\"text-align:center;\">Código de acceso: <b style=\"font-size:18px;letter-spacing:3px;\">" + acc.pin + "</b></p>" +
+            "<p style=\"color:#888;font-size:12px;\">Este correo es informativo. Ante cualquier duda consulte a su médico" + (d.lab.telefono ? " o comuníquese al " + esc(d.lab.telefono) : "") + ".</p>" +
+            "<p>Atentamente,<br><b>" + esc(d.lab.nombre) + "</b></p></div></div>";
+        const payload = {
+            tipo: "resultados", correo_paciente: correo, paciente: d.paciente, muestra: d.muestra,
+            asunto: "Resultados de laboratorio - " + d.lab.nombre, mensaje_html: html,
+            pdf_nombre: opt.filename, pdf_base64: pdf64, enlace_portal: enlace, laboratorio_nombre: d.lab.nombre, fecha: new Date().toLocaleString()
+        };
+        const res = await fetch(WEBHOOK_AUTOPEDIDO, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+        if (!res.ok) throw new Error("Make respondió " + res.status);
+        await db.ref("resultados/" + key + "/entregas/correo").set(new Date().toISOString());
+        await registrarAuditoria(key, "Enviado por correo", correo);
+        mostrarToast("Correo enviado", correo);
+        if (pacienteSeleccionadoId === key) renderizarEntrega(key);
+    } catch (e) {
+        console.error(e);
+        alert("⚠️ No se pudo enviar el correo a " + correo + ".\n\nDetalle: " + e.message);
+    }
+}
+
+async function copiarEnlacePortal() {
+    const key = pacienteSeleccionadoId; if (!key) return;
+    const c = await contactoDe(key);
+    if (!c.ci) return alert("Este resultado no tiene orden web con CI.");
+    const acc = await asegurarAccesoPortal(c.ci);
+    const texto = urlPortal(acc.token) + "  (Código: " + acc.pin + ")";
+    navigator.clipboard.writeText(texto).then(() => mostrarToast("Enlace copiado", texto)).catch(() => prompt("Copie el enlace:", texto));
+}
+
+function guardarConfigEntrega() {
+    configEntrega.auto_correo = document.getElementById('conf-auto-correo').checked;
+    db.ref("configuracion/entrega").set(configEntrega).then(() => mostrarToast("Entrega", "Configuración guardada."));
+}
+// Envía a Make un ejemplo con TODOS los campos, para que Make "aprenda" los datos nuevos
+function enviarPruebaMake() {
+    const ejemplo = {
+        tipo: "prueba", correo_paciente: "paciente@ejemplo.com", paciente: "PACIENTE DE PRUEBA", muestra: "0000000000",
+        asunto: "Resultados de laboratorio - prueba", mensaje_html: "<p>Prueba</p>", pdf_nombre: "Informe_prueba.pdf",
+        pdf_base64: "JVBERi0xLjQKJcfsj6IKMSAwIG9iago8PC9UeXBlL0NhdGFsb2cvUGFnZXMgMiAwIFI+PgplbmRvYmoKMiAwIG9iago8PC9UeXBlL1BhZ2VzL0tpZHNbXS9Db3VudCAwPj4KZW5kb2JqCnRyYWlsZXIKPDwvUm9vdCAxIDAgUj4+CiUlRU9G",
+        enlace_portal: urlPortal("ejemplo"), laboratorio_nombre: configLab.nombre,
+        codigo: "TEST", producto: "Producto de prueba", marca: "N/A", presentacion: "N/A", stock_actual: 0, cantidad_solicitada: 1,
+        distribuidor: "N/A", correo_proveedor: "proveedor@ejemplo.com", telefono_proveedor: "", laboratorio_telefono: configLab.telefono,
+        laboratorio_direccion: configLab.direccion, mensaje_formal: "<p>Prueba</p>", mensaje_texto: "Prueba", fecha: new Date().toLocaleString(), solicitado_por: usuarioActual()
+    };
+    fetch(WEBHOOK_AUTOPEDIDO, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(ejemplo) })
+        .then(r => { if (!r.ok) throw new Error("Make respondió " + r.status); mostrarToast("Make", "Datos de prueba enviados."); })
+        .catch(e => alert("No se pudo enviar a Make: " + e.message));
+}
+function renderizarConfigEntrega() {
+    const chk = document.getElementById('conf-auto-correo'); if (chk) chk.checked = !!configEntrega.auto_correo;
+    const u = document.getElementById('conf-url-portal'); if (u) { u.innerText = urlPortal(); u.href = urlPortal(); }
 }
 
 // =====================================================================
