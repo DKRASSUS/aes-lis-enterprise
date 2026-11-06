@@ -183,3 +183,16 @@ button.action-btn { padding: 15px 25px; border: none; border-radius: 6px; font-w
 .btn-wa:hover { background: #1EBE57; }
 .btn-mail { background: var(--aes-blue); color: white; }
 .btn-link { background: white; border: 2px solid var(--aes-purple) !important; color: var(--aes-purple); }
+.botones-etiqueta { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 12px; }
+.botones-etiqueta .btn-print { margin-top: 0; }
+.btn-comprobante { background: var(--aes-purple) !important; }
+.qr-box { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 12px auto 0; padding: 12px; background: white; border: 1px solid var(--border-color); border-radius: 8px; text-align: left; font-size: 0.85rem; max-width: 420px; }
+.qr-box img, .qr-box canvas { width: 110px !important; height: 110px !important; }
+.qr-pin { font-size: 1.3rem; font-weight: 800; letter-spacing: 3px; color: var(--aes-purple); }
+.status-pill.parc { background: #E0F2FE; color: #0369A1; }
+.btn-area { background: white; border: 1px solid var(--aes-purple); color: var(--aes-purple); border-radius: 6px; padding: 4px 10px; font-weight: 700; font-size: 0.75rem; cursor: pointer; }
+.btn-area:hover { background: var(--aes-purple); color: white; }
+.chk-val { width: 17px; height: 17px; vertical-align: middle; cursor: pointer; margin-right: 6px; }
+.ok-val { color: var(--success); font-weight: 800; margin-right: 6px; }
+.results-table tr.fila-validada td { background: #F0FDF4; }
+.btn-val-sel { background: white; border: 2px solid var(--success) !important; color: var(--success); }
