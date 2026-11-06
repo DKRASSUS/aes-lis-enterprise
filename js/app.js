@@ -97,6 +97,75 @@ function switchView(viewId, element) {
     }
 }
 
+
+// ---------- Carga por ventana de días (rendimiento) ----------
+let qOrdenes = null, qResVentana = null, qResPend = null;
+let llegaron = { o: false, v: false, p: false };
+let resVentana = {}, resPend = {}, resExtra = {}, ordenesVentana = {}, ordenesExtra = {}, ordenesPedidas = {}, seguidos = {};
+function diasVentana() { const n = parseInt(localStorageSeguro("aes_dias_ventana"), 10); return n > 0 ? n : 7; }
+function localStorageSeguro(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
+function desdeISO(dias) { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - dias + 1); return d.toISOString().substring(0, 10); }
+// Mantiene en vivo un resultado suelto (uno buscado o uno antiguo que se acaba de validar)
+function seguirResultado(k) {
+    if (seguidos[k]) return; seguidos[k] = true;
+    db.ref("resultados/" + k).on("value", s => { if (s.exists()) resExtra[k] = s.val(); else delete resExtra[k]; recomponerDatos(); });
+}
+let _recomponerPend = false;
+function recomponerDatos() {
+    if (_recomponerPend) return; _recomponerPend = true;
+    setTimeout(() => { _recomponerPend = false; aplicarDatos(); }, 30);
+}
+function aplicarDatos() {
+    ordenesGlobales = Object.assign({}, ordenesExtra, ordenesVentana);
+    datosGlobales = Object.assign({}, resExtra, resPend, resVentana);
+    // Trae la orden de los resultados cuya orden es más antigua que la ventana
+    Object.values(datosGlobales).forEach(r => {
+        const m = r.muestra; if (!m || ordenesGlobales[m] || ordenesPedidas[m] || /[.#$\[\]\/]/.test(m)) return;
+        ordenesPedidas[m] = true;
+        db.ref("ordenes_pendientes/" + m).once("value").then(s => { if (s.exists()) { ordenesExtra[m] = s.val(); recomponerDatos(); } }).catch(() => { });
+    });
+    if (!primeraCarga) {
+        Object.keys(datosGlobales).forEach(key => {
+            if (!keysAnteriores.has(key)) { const r = datosGlobales[key]; agregarNotificacion(key, nombreDeResultado(r).nombre, r.muestra); }
+        });
+    }
+    keysAnteriores = new Set(Object.keys(datosGlobales));
+    if (llegaron.o && llegaron.v && llegaron.p) primeraCarga = false; // no avisar de lo que ya existía al abrir
+    renderizarBandeja();
+    if (pacienteSeleccionadoId && datosGlobales[pacienteSeleccionadoId]) mostrarDetalle(pacienteSeleccionadoId);
+    const ve = document.getElementById('view-estadisticas'); if (ve && ve.classList.contains('active') && !cargandoEstadisticas) calcularEstadisticas();
+    const info = document.getElementById('info-ventana'); if (info) info.innerText = "Mostrando últimos " + diasVentana() + " días + todo lo pendiente";
+}
+// Búsqueda en todo el historial: por tubo, CI o nombre (nombre solo dentro de lo cargado)
+window.buscarEnHistorial = async function () {
+    const txt = (document.getElementById('buscar-historial').value || "").trim();
+    const caja = document.getElementById('resultado-busqueda');
+    if (!txt) { caja.innerText = ""; return; }
+    if (/[.#$\[\]\/]/.test(txt)) { caja.innerText = "Texto no válido"; return; }
+    caja.innerText = "Buscando...";
+    let encontrados = 0;
+    try {
+        const muestras = new Set([txt.toUpperCase(), txt]);
+        // ¿Es un CI? -> todas sus órdenes
+        const porCI = await db.ref("ordenes_pendientes").orderByChild("ci_paciente").equalTo(txt).once("value");
+        porCI.forEach(h => { ordenesExtra[h.key] = h.val(); muestras.add(h.key); });
+        for (const m of muestras) {
+            const o = await db.ref("ordenes_pendientes/" + m).once("value");
+            if (o.exists()) ordenesExtra[m] = o.val();
+            const rs = await db.ref("resultados").orderByChild("muestra").equalTo(m).once("value");
+            rs.forEach(h => { resExtra[h.key] = h.val(); seguirResultado(h.key); encontrados++; });
+        }
+    } catch (e) { caja.innerText = "Error al buscar: " + e.message; return; }
+    aplicarDatos();
+    caja.innerText = encontrados ? "✔ " + encontrados + " informe(s) encontrados. Revise las pestañas Pendientes / Validados / Rechazados." : "No se encontró nada con ese tubo o CI.";
+};
+window.cambiarDiasVentana = function () {
+    const n = parseInt(document.getElementById('conf-dias-ventana').value, 10);
+    if (!(n >= 1 && n <= 365)) return alert("Escriba un número de días entre 1 y 365");
+    localStorageSeguro("aes_dias_ventana", String(n));
+    detenerListeners(); iniciarListeners(); alert("Listo. Ahora se cargan los últimos " + n + " días.");
+};
+
 // Los listeners se activan SOLO después del login (con reglas seguras, antes del login no hay permiso)
 function iniciarListeners() {
     if (listenersActivos) return;
@@ -118,29 +187,31 @@ function iniciarListeners() {
         }
     });
 
-    db.ref("ordenes_pendientes").on("value", snap => { ordenesGlobales = snap.val() || {}; renderizarBandeja(); });
-
-    db.ref("resultados").on("value", snapshot => {
-        datosGlobales = snapshot.val() || {};
-        if (!primeraCarga) {
-            Object.keys(datosGlobales).forEach(key => {
-                if (!keysAnteriores.has(key)) {
-                    const r = datosGlobales[key];
-                    agregarNotificacion(key, nombreDeResultado(r).nombre, r.muestra);
-                }
-            });
-        }
-        keysAnteriores = new Set(Object.keys(datosGlobales)); primeraCarga = false;
-        renderizarBandeja();
-        if (pacienteSeleccionadoId && datosGlobales[pacienteSeleccionadoId]) mostrarDetalle(pacienteSeleccionadoId);
-        if (document.getElementById('view-estadisticas').classList.contains('active')) calcularEstadisticas();
+    // RENDIMIENTO: ya no se descarga todo el historial. Se escucha en vivo:
+    //  - las órdenes y resultados de los últimos N días (configurable, por defecto 7)
+    //  - TODOS los resultados aún sin validar (estado "Completado"), sin importar su antigüedad
+    // Lo más antiguo se trae solo cuando se busca (buscarEnHistorial) o se piden estadísticas.
+    const desde = desdeISO(diasVentana()); llegaron = { o: false, v: false, p: false };
+    qOrdenes = db.ref("ordenes_pendientes").orderByChild("fecha_creacion").startAt(desde);
+    qOrdenes.on("value", snap => { ordenesVentana = snap.val() || {}; llegaron.o = true; recomponerDatos(); });
+    qResVentana = db.ref("resultados").orderByChild("fecha_recepcion").startAt(desde);
+    qResVentana.on("value", snap => { resVentana = snap.val() || {}; llegaron.v = true; recomponerDatos(); });
+    qResPend = db.ref("resultados").orderByChild("estado").equalTo("Completado");
+    qResPend.on("value", snap => {
+        const nuevo = snap.val() || {};
+        // Si un resultado antiguo deja de estar pendiente (se validó/rechazó) lo seguimos mostrando
+        Object.keys(resPend).forEach(k => { if (!nuevo[k] && !resVentana[k]) seguirResultado(k); });
+        resPend = nuevo; llegaron.p = true; recomponerDatos();
     });
 
     db.ref("inventario").on("value", snapshot => { inventarioGlobal = snapshot.val() || {}; renderizarInventario(); });
 }
 function detenerListeners() {
     if (!listenersActivos) return;
-    ["configuracion", "ordenes_pendientes", "resultados", "inventario"].forEach(r => db.ref(r).off());
+    ["configuracion", "inventario"].forEach(r => db.ref(r).off());
+    [qOrdenes, qResVentana, qResPend].forEach(q => { if (q) q.off(); });
+    Object.keys(seguidos).forEach(k => db.ref("resultados/" + k).off()); seguidos = {};
+    resVentana = {}; resPend = {}; resExtra = {}; ordenesVentana = {}; ordenesExtra = {}; ordenesPedidas = {};
     listenersActivos = false; primeraCarga = true; keysAnteriores = new Set();
 }
 
@@ -356,6 +427,7 @@ function buscarHistorial(ci) {
         document.getElementById('panel-historial').style.display = "block";
         const ordenes = []; snapshot.forEach(hijo => { ordenes.push(hijo.val()); });
         ordenes.sort((a, b) => String(b.fecha_creacion).localeCompare(String(a.fecha_creacion)));
+        ordenes.splice(20); // solo las 20 más recientes
 
         // Estado real según los resultados ya cargados en memoria
         const estadoPorMuestra = {};
@@ -373,10 +445,20 @@ function buscarHistorial(ci) {
             else if (est === "Rechazado") { estadoVisual = "✖ Rechazado"; colorEstado = "var(--danger)"; }
             else if (est) { estadoVisual = "Procesando"; colorEstado = "var(--warning)"; }
             h += "<tr><td>" + esc(new Date(o.fecha_creacion).toLocaleDateString()) + "</td><td>" + esc(o.medico || 'N/A') + "</td><td><strong>" + esc(o.examenes ? o.examenes.join(", ") : "") + "</strong></td>" +
-                "<td><span style=\"color: " + colorEstado + "; font-weight: bold;\">" + estadoVisual + "</span></td>" +
+                "<td><span id=\"hist-est-" + esc(o.id_muestra) + "\" style=\"color: " + colorEstado + "; font-weight: bold;\">" + estadoVisual + "</span></td>" +
                 "<td><button onclick=\"cargarExamenesDesdeHistorial(" + jsArg(o.id_muestra) + ")\" style=\"background: #E0F2FE; color: var(--aes-blue); border: 1px solid var(--aes-blue); padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: bold;\" title=\"Repetir estas pruebas\">🔄 Repetir</button></td></tr>";
         });
         tabla.innerHTML = h;
+        // Las órdenes antiguas no están en memoria: se consulta su estado una por una
+        ordenes.filter(o => o.id_muestra && !estadoPorMuestra[o.id_muestra]).forEach(o => {
+            db.ref("resultados").orderByChild("muestra").equalTo(o.id_muestra).once("value").then(rs => {
+                let est = null; rs.forEach(x => { const e = x.val().estado; if (e === "Validado_Final" || !est) est = e; });
+                const span = document.getElementById("hist-est-" + o.id_muestra); if (!span || !est) return;
+                if (est === "Validado_Final") { span.innerText = "✔ Validado"; span.style.color = "var(--success)"; }
+                else if (est === "Rechazado") { span.innerText = "✖ Rechazado"; span.style.color = "var(--danger)"; }
+                else { span.innerText = "Procesando"; span.style.color = "var(--warning)"; }
+            }).catch(() => { });
+        });
     });
 }
 window.cargarExamenesDesdeHistorial = function (idMuestra) {
@@ -562,7 +644,7 @@ function categoriaDe(prueba) {
 
 // Nombre y datos del paciente de un resultado (cruzando con la orden web)
 function nombreDeResultado(r) {
-    const o = ordenesGlobales[r.muestra];
+    const o = ordenesGlobales[r.muestra] || statsCache.ord[r.muestra];
     if (o) return { nombre: o.nombre_paciente, huerfano: false, orden: o };
     if (r.paciente && r.paciente !== "Paciente Desconocido" && r.paciente !== "Desconocido") return { nombre: r.paciente, huerfano: true, orden: null };
     return { nombre: "Paciente No Registrado", huerfano: true, orden: null };
@@ -586,6 +668,7 @@ function listaResultados(r) {
     return out;
 }
 
+function msDe(r) { const f = fechaDeResultado(r); return f ? f.getTime() : 0; }
 function fechaDeResultado(r) {
     if (r.fecha_recepcion) { const d = new Date(r.fecha_recepcion); if (!isNaN(d)) return d; }
     const m = r.muestra || "";
@@ -632,7 +715,7 @@ function cambiarFiltroBandeja(nuevoFiltro) {
 }
 function renderizarBandeja() {
     const lista = document.getElementById("lista-pacientes"); let h = ""; let n = 0;
-    Object.keys(datosGlobales).reverse().forEach(key => {
+    Object.keys(datosGlobales).sort((a, b) => (msDe(datosGlobales[b]) - msDe(datosGlobales[a])) || (a < b ? 1 : -1)).forEach(key => {
         const r = datosGlobales[key];
         if (filtroDeEstado(r.estado) !== filtroActual) return;
         n++;
@@ -1069,6 +1152,7 @@ function enviarPruebaMake() {
         .catch(e => alert("No se pudo enviar a Make: " + e.message));
 }
 function renderizarConfigEntrega() {
+    const cdv = document.getElementById("conf-dias-ventana"); if (cdv) cdv.value = diasVentana();
     const chk = document.getElementById('conf-auto-correo'); if (chk) chk.checked = !!configEntrega.auto_correo;
     const u = document.getElementById('conf-url-portal'); if (u) { u.innerText = urlPortal(); u.href = urlPortal(); }
 }
@@ -1083,19 +1167,37 @@ window.filtrarTablaParametros = function () {
         fila.style.display = fila.cells[0].innerText.toUpperCase().includes(filtro) ? '' : 'none';
     });
 };
+// Estadísticas: el rango elegido se trae de la base SOLO al pedirlo (no está todo en memoria)
+let statsCache = { rango: "", res: {}, ord: {} }; let cargandoEstadisticas = false;
+async function cargarRangoEstadisticas(ini, fin) {
+    const rango = ini + "|" + fin; if (statsCache.rango === rango) return;
+    cargandoEstadisticas = true;
+    try {
+        const desde = ini, hasta = fin + "\uf8ff";
+        const [rs, os] = await Promise.all([
+            db.ref("resultados").orderByChild("fecha_recepcion").startAt(desde).endAt(hasta).once("value"),
+            db.ref("ordenes_pendientes").orderByChild("fecha_creacion").startAt(desde).endAt(hasta).once("value")]);
+        statsCache = { rango: rango, res: rs.val() || {}, ord: os.val() || {} };
+    } finally { cargandoEstadisticas = false; }
+}
 function resultadosEnRango() {
     const ini = document.getElementById('filtro-fecha-inicio').value, fin = document.getElementById('filtro-fecha-fin').value;
     const fInicio = new Date(ini + "T00:00:00"); const fFin = new Date(fin + "T23:59:59");
-    const out = [];
-    Object.keys(datosGlobales).forEach(key => {
-        const r = datosGlobales[key]; if (r.estado === "Rechazado") return;
+    const out = []; const todos = Object.assign({}, statsCache.res, datosGlobales);
+    Object.keys(todos).forEach(key => {
+        const r = todos[key]; if (r.estado === "Rechazado") return;
         const f = fechaDeResultado(r);
         if (f && f >= fInicio && f <= fFin) out.push({ key: key, r: r, fecha: f });
     });
     return out;
 }
-window.calcularEstadisticas = function () {
-    if (!document.getElementById('filtro-fecha-inicio').value || !document.getElementById('filtro-fecha-fin').value) return alert("Seleccione el rango de fechas");
+window.calcularEstadisticas = async function () {
+    const ini = document.getElementById('filtro-fecha-inicio').value, fin = document.getElementById('filtro-fecha-fin').value;
+    if (!ini || !fin) return alert("Seleccione el rango de fechas");
+    if (statsCache.rango !== ini + "|" + fin) {
+        document.getElementById('tabla-estadisticas').innerHTML = "<tr><td colspan=\"2\" style=\"text-align:center; padding:20px; color:#888;\">⏳ Cargando datos del rango...</td></tr>";
+        try { await cargarRangoEstadisticas(ini, fin); } catch (e) { return alert("No se pudieron cargar las estadísticas: " + e.message); }
+    }
     const registros = resultadosEnRango(); const conteo = {};
     registros.forEach(x => listaResultados(x.r).forEach(res => { conteo[res.n] = (conteo[res.n] || 0) + 1; }));
     document.getElementById('stat-total-tubos').innerText = registros.length;
