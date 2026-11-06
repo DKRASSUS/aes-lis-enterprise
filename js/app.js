@@ -848,13 +848,31 @@ function enviarWebhook(codigo, item, hoyStr) {
         "Por favor, confirmar la recepción de este pedido y el tiempo estimado de entrega a nuestras instalaciones en: " + configLab.direccion + ".\n\n" +
         "Atentamente,\n*" + configLab.nombre + "*\nTeléfono: " + configLab.telefono;
 
+    // Versión con formato para correo (en una sola línea, sin saltos)
+    const fila = (k, v) => "<tr><td style=\"padding:8px 12px;border:1px solid #E2E8F0;background:#F8FAFC;font-weight:bold;width:40%;\">" + k + "</td><td style=\"padding:8px 12px;border:1px solid #E2E8F0;\">" + esc(v) + "</td></tr>";
+    const mensajeHTML =
+        "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#333;max-width:600px;\">" +
+        "<div style=\"background:#1A1A24;color:#fff;padding:14px 18px;border-radius:6px 6px 0 0;\"><b style=\"font-size:16px;\">Solicitud de pedido de reactivo</b><br><span style=\"color:#00A8E8;\">" + esc(configLab.nombre) + "</span></div>" +
+        "<div style=\"border:1px solid #E2E8F0;border-top:none;padding:18px;border-radius:0 0 6px 6px;\">" +
+        "<p>Estimados señores de <b>" + esc(item.distribuidor !== "N/A" ? item.distribuidor : "Ventas") + "</b>:</p>" +
+        "<p>Por medio de la presente, el laboratorio <b>" + esc(configLab.nombre) + "</b> solicita cordialmente el abastecimiento del siguiente producto:</p>" +
+        "<table style=\"border-collapse:collapse;width:100%;margin:12px 0;\">" +
+        fila("Producto", item.nombre + (item.presentacion !== "N/A" ? " (" + item.presentacion + ")" : "")) +
+        fila("Marca", item.marca) +
+        fila("Código / Ref.", item.codigo) +
+        fila("Cantidad solicitada", item.cantidad_pedido + " unidades/cajas") +
+        "</table>" +
+        "<p>Por favor, confirmar la recepción de este pedido y el tiempo estimado de entrega" + (configLab.direccion ? " a nuestras instalaciones en: <b>" + esc(configLab.direccion) + "</b>" : "") + ".</p>" +
+        "<p>Atentamente,<br><b>" + esc(configLab.nombre) + "</b>" + (configLab.telefono ? "<br>Teléfono: " + esc(configLab.telefono) : "") + "</p>" +
+        "</div></div>";
+
     const payload = {
         tipo: "autopedido",
         codigo: item.codigo, producto: item.nombre, marca: item.marca, presentacion: item.presentacion,
         stock_actual: item.stock, cantidad_solicitada: item.cantidad_pedido, distribuidor: item.distribuidor,
         correo_proveedor: item.correo_proveedor, telefono_proveedor: item.telefono_proveedor,
         laboratorio_nombre: configLab.nombre, laboratorio_telefono: configLab.telefono, laboratorio_direccion: configLab.direccion,
-        mensaje_formal: mensajeFormal, fecha: new Date().toLocaleString(), solicitado_por: usuarioActual()
+        mensaje_formal: mensajeHTML, mensaje_texto: mensajeFormal, fecha: new Date().toLocaleString(), solicitado_por: usuarioActual()
     };
 
     mostrarToast("Auto-Pedido", "Enviando pedido al proveedor de " + item.nombre + "...");
