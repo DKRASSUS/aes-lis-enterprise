@@ -91,7 +91,7 @@
             <div id="view-validacion" class="view-section">
                 <div class="validacion-grid">
                     <div class="panel inbox-panel">
-                        <div class="filter-controls"><button class="filter-btn active" id="btn-filtro-pendientes" onclick="cambiarFiltroBandeja('Pendientes')">📥 Pendientes</button><button class="filter-btn" id="btn-filtro-validados" onclick="cambiarFiltroBandeja('Validados')">🗄️ Histórico</button></div>
+                        <div class="filter-controls"><button class="filter-btn active" id="btn-filtro-pendientes" onclick="cambiarFiltroBandeja('Pendientes')">📥 Pendientes</button><button class="filter-btn" id="btn-filtro-validados" onclick="cambiarFiltroBandeja('Validados')">🗄️ Validados</button><button class="filter-btn" id="btn-filtro-rechazados" onclick="cambiarFiltroBandeja('Rechazados')">🚫 Rechazados</button></div>
                         <div class="patient-list" id="lista-pacientes"></div>
                     </div>
                     <div class="review-area">
@@ -100,9 +100,14 @@
                             <div class="panel panel-blue" style="padding-bottom: 15px;"><div class="info-grid"><div class="info-item"><label>Nombre</label><span id="detalle-nombre">---</span></div><div class="info-item"><label>ID (Tubo)</label><span class="sample-id-badge" id="detalle-muestra">---</span></div><div class="info-item"><label>Equipo</label><span id="detalle-equipo">---</span></div></div></div>
                             <div class="panel" style="padding-top: 10px;">
                                 <h3 class="panel-title">Resultados <span id="badge-estado-visor" style="background: #E0F2FE; color: var(--aes-blue); padding: 4px 12px; border-radius: 20px; font-size: 0.75rem;">Pendiente</span></h3>
-                                <table class="results-table"><thead><tr><th>Análisis Clínico</th><th>Valor</th><th>Unidad</th></tr></thead><tbody id="tabla-analitos"></tbody></table>
+                                <table class="results-table"><thead><tr><th>Análisis Clínico</th><th>Valor</th><th>Unidad</th><th>Referencia</th></tr></thead><tbody id="tabla-analitos"></tbody></table>
                                 <div class="action-panel" id="botones-pendientes"><button class="action-btn btn-reject" onclick="rechazarMuestra()">✖ Rechazar</button><button class="action-btn btn-validate-pdf" onclick="validarYGenerarPDF()">✔ Validar e Imprimir</button></div>
-                                <div class="action-panel" id="botones-validados" style="display: none;"><button class="action-btn btn-revert" onclick="revertirValidacion()">↩ Revertir</button><button class="action-btn btn-reprint" onclick="descargarSoloPDF()">🖨️ Re-imprimir</button></div>
+                                <div class="action-panel" id="botones-validados" style="display: none;"><button class="action-btn btn-revert" onclick="revertirValidacion()">↩ Revertir</button><button class="action-btn btn-reprint" onclick="descargarSoloPDF(false)">🖨️ Re-imprimir</button></div>
+                                <div class="action-panel" id="botones-rechazados" style="display: none;"><button class="action-btn btn-revert" onclick="restaurarRechazado()">↩ Devolver a Pendientes</button></div>
+                            </div>
+                            <div class="panel" style="padding-top: 10px;">
+                                <h3 class="panel-title" style="font-size: 0.9rem;">🕓 Trazabilidad (quién hizo qué)</h3>
+                                <div id="auditoria-lista"></div>
                             </div>
                         </div>
                     </div>
@@ -217,6 +222,25 @@
                         <table class="history-table" style="margin-top: 20px;"><thead><tr><th>Prueba (ID)</th><th>Precio Base</th><th>Acción</th></tr></thead><tbody id="tabla-conf-pruebas"></tbody></table>
                     </div>
                 </div>
+
+                <!-- VALORES DE REFERENCIA -->
+                <div class="panel panel-blue" style="margin-top: 20px;">
+                    <h3 class="panel-title">📏 Valores de Referencia</h3>
+                    <p style="font-size: 0.85rem; color: #666; margin-top: 0;">Cargue los rangos de los insertos de sus reactivos. Si una prueba no tiene rango aquí, el LIS usa el que envía el equipo; si tampoco hay, se imprime "Según inserto". Los resultados fuera de rango se marcan con ▲ H o ▼ L.</p>
+                    <div class="form-row-3">
+                        <div class="form-group"><label>Prueba (Ej: GLU)</label><input type="text" id="ref-id"></div>
+                        <div class="form-group"><label>Unidad (Ej: mg/dL)</label><input type="text" id="ref-unidad"></div>
+                        <div class="form-group"><label>Texto a imprimir (opcional)</label><input type="text" id="ref-texto" placeholder="Ej: Ayunas: 70 - 110"></div>
+                    </div>
+                    <div class="form-row-4">
+                        <div class="form-group"><label>Mínimo (general / hombre)</label><input type="number" step="any" id="ref-min"></div>
+                        <div class="form-group"><label>Máximo (general / hombre)</label><input type="number" step="any" id="ref-max"></div>
+                        <div class="form-group"><label>Mínimo mujer (si cambia)</label><input type="number" step="any" id="ref-min-f"></div>
+                        <div class="form-group"><label>Máximo mujer (si cambia)</label><input type="number" step="any" id="ref-max-f"></div>
+                    </div>
+                    <button class="btn-success-adm" style="margin-top:0; padding: 10px;" onclick="guardarReferencia()">Guardar Rango</button>
+                    <table class="history-table" style="margin-top: 20px;"><thead><tr><th>Prueba</th><th>Unidad</th><th>Rango general / hombre</th><th>Rango mujer</th><th>Acción</th></tr></thead><tbody id="tabla-conf-referencias"></tbody></table>
+                </div>
             </div>
 
         </main>
@@ -252,8 +276,9 @@
                 <div><h1 style="margin:0; color: #1A1A24; font-size: 28px;">AES <span style="color: #00A8E8;">O.S.</span></h1><p style="margin:0; font-size: 13px; color: #666; font-weight: bold;">LABORATORIO CLÍNICO</p></div>
                 <div style="text-align: right;"><h2 style="margin:0; color: #00A8E8; font-size: 22px;">INFORME DE RESULTADOS</h2><p style="margin:0; font-size: 12px; font-weight: bold;" id="pdf-fecha"></p></div>
             </div>
-            <div class="pdf-patient-box"><div><strong>Paciente:</strong> <span id="pdf-paciente"></span><br><strong>ID de Muestra:</strong> <span id="pdf-orden"></span></div><div><strong>Equipo:</strong> <span id="pdf-equipo"></span><br><strong>Estado:</strong> VALIDADOS</div></div>
+            <div class="pdf-patient-box"><div><strong>Paciente:</strong> <span id="pdf-paciente"></span><br><strong>CI:</strong> <span id="pdf-ci"></span><br><strong>Edad / Sexo:</strong> <span id="pdf-edad-sexo"></span><br><strong>Médico:</strong> <span id="pdf-medico"></span></div><div><strong>ID de Muestra:</strong> <span id="pdf-orden"></span><br><strong>Equipo:</strong> <span id="pdf-equipo"></span><br><strong>Estado:</strong> VALIDADO</div></div>
             <div id="pdf-resultados-dinamicos"></div>
+            <div class="pdf-firma"><div style="font-size: 10px; color: #888;">Los valores marcados con ▲ H (alto) o ▼ L (bajo) están fuera del rango de referencia.</div><div style="margin-top: 10px; font-size: 11px;"><strong>Validado por:</strong> <span id="pdf-validado-por"></span></div></div>
         </div>
     </div>
 
