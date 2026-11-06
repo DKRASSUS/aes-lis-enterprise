@@ -17,8 +17,10 @@ let tokenURL = (params.get("t") || "").replace(/[^a-z0-9]/gi, "");
 let tokenActivo = "", pinActivo = "";
 let ordenes = [];   // [{key, fecha, o}]  o = {muestra, examenes:[{codigo,estado}], completo, d, ...}
 
+let labPublico = {};
 db.ref("portal_publico/laboratorio").once("value").then(s => {
     const l = s.val(); if (!l) return;
+    labPublico = l;
     if (l.nombre) { document.getElementById("lab-nombre").innerText = l.nombre; document.title = "Resultados - " + l.nombre; }
     const c = [l.direccion, l.telefono].filter(Boolean).join(" · ");
     if (c) document.getElementById("lab-contacto").innerText = c;
@@ -141,4 +143,19 @@ function pdf(i, btn) {
     const txt = btn.innerText; btn.disabled = true; btn.innerText = "⏳";
     html2pdf().set({ margin: 10, filename: "Resultados_" + d.muestra + (d.pendientes.length ? "_parcial" : "") + ".pdf", image: { type: "jpeg", quality: 0.95 }, html2canvas: { scale: 2 }, jsPDF: { unit: "mm", format: "a4", orientation: "portrait" } })
         .from(div).save().finally(() => { div.remove(); btn.disabled = false; btn.innerText = txt; });
+}
+
+function olvide() {
+    const box = document.getElementById("ayuda-codigo");
+    const ci = document.getElementById("ci").value.trim();
+    const tel = String(labPublico.telefono || "").replace(/\D/g, "");
+    const num = tel.length === 8 ? "591" + tel : tel;
+    let h = "Su código de 6 caracteres está en el <b>comprobante</b> que le dieron al registrar su orden, en el <b>PDF</b> de sus resultados y en los mensajes de <b>WhatsApp</b> o <b>correo</b> del laboratorio.";
+    if (num) {
+        const msg = "Hola, olvidé mi código del portal de resultados." + (ci ? " Mi CI es " + ci + "." : "");
+        h += "<br>Si no lo encuentra, pídalo al laboratorio:<br><a class=\"b-wa\" target=\"_blank\" href=\"https://wa.me/" + num + "?text=" + encodeURIComponent(msg) + "\">📱 Pedir mi código por WhatsApp</a>";
+    } else if (labPublico.telefono) {
+        h += "<br>Si no lo encuentra, llame al laboratorio: <b>" + esc(labPublico.telefono) + "</b>";
+    }
+    box.innerHTML = h; box.style.display = "block";
 }

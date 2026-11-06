@@ -339,10 +339,12 @@ function buscarPaciente() {
             document.getElementById('genero').value = p.genero || "M";
             document.getElementById('celular').value = p.celular || "";
             document.getElementById('correo').value = p.correo || "";
+            mostrarInfoPortal(ci, p);
             buscarHistorial(ci);
         } else {
             mostrarToast("Paciente nuevo", "No existe el CI " + ci + ". Complete sus datos.");
             ['nombre', 'fecha_nac', 'celular', 'correo'].forEach(c => document.getElementById(c).value = "");
+            document.getElementById('info-portal').style.display = "none";
             document.getElementById('panel-historial').style.display = "none";
         }
     }).catch(e => alert("Error al buscar: " + e.message));
@@ -446,6 +448,29 @@ async function generarOrden() {
     } finally {
         btn.disabled = false; btn.innerHTML = txt;
     }
+}
+
+// ---------- Código del portal de un paciente (para reenviarlo si lo perdió) ----------
+function mostrarInfoPortal(ci, p) {
+    const box = document.getElementById('info-portal');
+    if (!p || !p.portal_pin || !p.portal_token) { box.style.display = "none"; return; }
+    box.innerHTML = "🌐 Código del portal: <b class=\"qr-pin\" style=\"font-size:1.05rem;\">" + esc(p.portal_pin) + "</b>" +
+        "<span style=\"display:flex;gap:6px;\"><button onclick=\"reenviarCodigoWhatsApp(" + jsArg(ci) + ")\">📱 Reenviar por WhatsApp</button>" +
+        "<button onclick=\"copiarCodigoPortal(" + jsArg(ci) + ")\">📋 Copiar enlace y código</button></span>";
+    box.style.display = "flex";
+}
+async function reenviarCodigoWhatsApp(ci) {
+    const p = (await db.ref("pacientes/" + ci).once("value")).val() || {};
+    let cel = document.getElementById('celular').value.trim() || p.celular;
+    if (!cel) { cel = prompt("📱 Número de WhatsApp del paciente (Ej: 70012345):"); if (!cel) return; db.ref("pacientes/" + ci + "/celular").set(cel.trim()); }
+    const texto = "Hola " + (p.nombre || "") + " 👋\n\nEste es su acceso al portal de resultados de *" + (configLab.nombre || "el laboratorio") + "*:\n" +
+        urlPortal(p.portal_token) + "\n\nCódigo de acceso: *" + p.portal_pin + "*\n\nTambién puede entrar con su CI y este código en:\n" + urlPortal();
+    window.open("https://wa.me/" + normalizarCelular(cel) + "?text=" + encodeURIComponent(texto), "_blank");
+}
+async function copiarCodigoPortal(ci) {
+    const p = (await db.ref("pacientes/" + ci).once("value")).val() || {};
+    const t = urlPortal(p.portal_token) + "  (Código: " + p.portal_pin + ")";
+    navigator.clipboard.writeText(t).then(() => mostrarToast("Copiado", t)).catch(() => prompt("Copie:", t));
 }
 
 // ---------- Comprobante, etiqueta y acceso del paciente ----------
