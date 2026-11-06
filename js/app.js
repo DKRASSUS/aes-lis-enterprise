@@ -155,7 +155,41 @@ function buscarHistorial(ci) {
     db.ref("ordenes_pendientes").orderByChild("ci_paciente").equalTo(ci).once("value", snapshot => {
         if(snapshot.exists()) {
             document.getElementById('panel-historial').style.display = "block";
-            snapshot.forEach(hijo => { const o = hijo.val(); tabla.insertAdjacentHTML("afterbegin", "<tr><td>" + new Date(o.fecha_creacion).toLocaleDateString() + "</td><td>" + (o.medico||'N/A') + "</td><td><strong>" + (o.examenes?o.examenes.join(", "):"") + "</strong></td><td><span style=\"color: var(--aes-blue); font-weight: bold;\">" + o.estado + "</span></td></tr>"); });
+            const ordenes = [];
+            snapshot.forEach(hijo => ordenes.push(hijo.val()));
+            
+            // Consultamos los resultados para ver el estado real
+            db.ref("resultados").once("value", resSnap => {
+                const resultadosDB = resSnap.val() || {};
+                
+                ordenes.reverse().forEach(o => { 
+                    // Verificamos si existe resultado para este ID de muestra
+                    let estadoVisual = o.estado;
+                    let colorEstado = "var(--aes-blue)";
+                    
+                    if(resultadosDB[o.id_muestra]) {
+                        if(resultadosDB[o.id_muestra].estado === "Validado_Final") {
+                            estadoVisual = "✔ Validado";
+                            colorEstado = "var(--success)";
+                        } else {
+                            estadoVisual = "Procesando";
+                            colorEstado = "var(--warning)";
+                        }
+                    }
+                    
+                    const arrayExamenes = o.examenes ? JSON.stringify(o.examenes).replace(/"/g, '&quot;') : '[]';
+                    
+                    tabla.insertAdjacentHTML("beforeend", 
+                        "<tr>" +
+                            "<td>" + new Date(o.fecha_creacion).toLocaleDateString() + "</td>" +
+                            "<td>" + (o.medico||'N/A') + "</td>" +
+                            "<td><strong>" + (o.examenes?o.examenes.join(", "):"") + "</strong></td>" +
+                            "<td><span style=\"color: " + colorEstado + "; font-weight: bold;\">" + estadoVisual + "</span></td>" +
+                            "<td><button onclick=\"cargarExamenesDesdeHistorial('" + arrayExamenes + "')\" style=\"background: #E0F2FE; color: var(--aes-blue); border: 1px solid var(--aes-blue); padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: bold;\" title=\"Repetir estas pruebas\">🔄 Repetir</button></td>" +
+                        "</tr>"
+                    ); 
+                });
+            });
         }
     });
 }
