@@ -224,3 +224,18 @@ button.action-btn { padding: 15px 25px; border: none; border-radius: 6px; font-w
 .chip-prueba.rechazado { background: #FEE2E2; color: #991B1B; }
 .status-pill.sinres { background: #F1F5F9; color: #64748B; }
 .btn-abrir-hist { background: #E0F2FE; color: var(--aes-blue); border: 1px solid var(--aes-blue); border-radius: 5px; padding: 4px 10px; font-weight: bold; cursor: pointer; }
+
+/* ---- Roles (v5) ---- */
+.form-usuario { display: grid; grid-template-columns: 1.2fr 1.4fr 1.2fr 1fr auto; gap: 8px; }
+.form-usuario input, .form-usuario select { padding: 8px; border: 1px solid #CBD5E1; border-radius: 6px; width: 100%; box-sizing: border-box; }
+.acciones-usuario button { margin: 2px; padding: 4px 9px; border: 1px solid #CBD5E1; background: #F8FAFC; border-radius: 5px; cursor: pointer; font-size: 0.78rem; }
+.usuario-inactivo td { color: #94A3B8; }
+.solo-admin { display: none; }
+body.rol-admin .solo-admin { display: block; }
+/* Recepción y Solo consulta: ven los informes pero no pueden validar, rechazar ni revertir */
+body.rol-recepcion #botones-pendientes, body.rol-consulta #botones-pendientes,
+body.rol-recepcion .btn-revert, body.rol-consulta .btn-revert,
+body.rol-recepcion .btn-area, body.rol-consulta .btn-area,
+body.rol-recepcion .chk-val, body.rol-consulta .chk-val,
+body.rol-recepcion .btn-delete-card, body.rol-consulta .btn-delete-card,
+body.rol-consulta #panel-entrega, body.rol-consulta .btn-reprint { display: none !important; }
