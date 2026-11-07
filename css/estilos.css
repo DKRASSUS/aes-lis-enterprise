@@ -271,3 +271,36 @@ body.rol-consulta #panel-entrega, body.rol-consulta .btn-reprint { display: none
 .cierre-resumen { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 6px 10px; }
 .fila-cierre { display: flex; justify-content: space-between; font-size: 0.85rem; padding: 3px 0; border-bottom: 1px dashed #E2E8F0; }
 .fila-cierre.total { border: none; font-size: 0.95rem; color: #166534; padding-top: 6px; }
+
+/* ---- Control de calidad (v6) ---- */
+.qc-grid { display: grid; grid-template-columns: 340px 1fr; gap: 20px; }
+@media (max-width: 1100px) { .qc-grid { grid-template-columns: 1fr; } }
+.qc-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 9px 10px; border: 1px solid #E2E8F0; border-radius: 8px; margin-bottom: 6px; cursor: pointer; }
+.qc-item:hover { background: #F8FAFC; } .qc-item.activo { border-color: var(--aes-blue); background: #EFF6FF; }
+.qc-item .s { font-size: 0.75rem; color: #64748B; }
+.qc-est { font-size: 0.72rem; font-weight: bold; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+.qc-est.ok { background: #DCFCE7; color: #166534; } .qc-est.adv { background: #FEF3C7; color: #92400E; } .qc-est.rech { background: #FEE2E2; color: #991B1B; } .qc-est.nada { background: #F1F5F9; color: #64748B; }
+.qc-form { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.qc-form label { display: block; font-size: 0.72rem; font-weight: bold; color: #475569; margin-bottom: 2px; }
+.qc-form input, .qc-form select { width: 100%; padding: 7px; border: 1px solid #CBD5E1; border-radius: 6px; box-sizing: border-box; }
+.qc-cab { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; align-items: flex-start; }
+.qc-datos { display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.85rem; color: #334155; }
+.qc-carga { display: flex; gap: 8px; align-items: center; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px; margin: 12px 0; flex-wrap: wrap; }
+.qc-carga input { padding: 8px; border: 1px solid #CBD5E1; border-radius: 6px; width: 130px; font-size: 1rem; }
+.qc-graf { position: relative; }
+.qc-graf svg { width: 100%; height: auto; display: block; }
+.qc-tip { position: absolute; pointer-events: none; background: #0F172A; color: #fff; font-size: 0.78rem; padding: 6px 9px; border-radius: 6px; display: none; white-space: nowrap; z-index: 5; }
+.qc-clave { display: flex; gap: 14px; font-size: 0.78rem; color: #475569; margin: 4px 0 10px; flex-wrap: wrap; }
+.qc-aviso { background: #FEF2F2; border: 1px solid #FCA5A5; color: #991B1B; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 8px; }
+.qc-aviso.adv { background: #FFFBEB; border-color: #FCD34D; color: #92400E; }
+
+/* ---- Informe profesional (v6) ---- */
+.logo-box { display: flex; gap: 10px; align-items: center; }
+.logo-box img { max-height: 60px; max-width: 160px; border: 1px solid #E2E8F0; border-radius: 6px; padding: 3px; background: #fff; }
+.modal-firma { position: fixed; inset: 0; background: rgba(15,23,42,.55); z-index: 9000; display: flex; align-items: center; justify-content: center; }
+.modal-firma-caja { background: #fff; border-radius: 12px; padding: 24px; width: 620px; max-width: 94vw; max-height: 92vh; overflow: auto; }
+.obs-box { margin-top: 10px; }
+.obs-box label { display: block; font-size: 0.8rem; font-weight: bold; color: #475569; margin-bottom: 4px; }
+.obs-box textarea { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #CBD5E1; border-radius: 6px; font-family: inherit; }
+.btn-com { background: none; border: none; cursor: pointer; font-size: 0.95rem; opacity: .55; padding: 0 4px; } .btn-com:hover, .btn-com.tiene { opacity: 1; }
+.com-fila td { font-size: 0.8rem; color: #475569; font-style: italic; padding-top: 0 !important; }
