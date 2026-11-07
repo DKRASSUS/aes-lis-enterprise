@@ -21,6 +21,7 @@
             <div style="text-align: left; margin-bottom: 25px;"><label style="font-size: 0.8rem; font-weight: bold; color: #555;">Contraseña</label><input type="password" id="login-pass" style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; margin-top: 5px;"></div>
             <button onclick="iniciarSesion()" style="width: 100%; background: var(--aes-blue); color: white; border: none; padding: 15px; border-radius: 6px; font-weight: bold; font-size: 1rem; cursor: pointer;">Ingresar</button>
             <p id="login-error" style="color: red; font-size: 0.8rem; margin-top: 15px; display: none;">Error.</p>
+            <a href="#" onclick="olvideClaveLogin(); return false;" style="display:block; margin-top:12px; font-size:0.85rem; color: var(--aes-blue);">¿Olvidó su contraseña?</a>
         </div>
     </div>
     
@@ -280,7 +281,7 @@
                     <div class="form-usuario">
                         <input type="text" id="nu-nombre" placeholder="Nombre (Ej: Dra. Pérez)">
                         <input type="email" id="nu-email" placeholder="Correo">
-                        <div style="display:flex; gap:4px;"><input type="password" id="nu-clave" placeholder="Contraseña temporal" style="flex:1;"><button type="button" onclick="generarClaveTemporal()" title="Generar una al azar">🎲</button></div>
+                        <div style="display:flex; gap:4px;"><input type="text" id="nu-clave" placeholder="Contraseña temporal" autocomplete="off" style="flex:1;"><button type="button" onclick="generarClaveTemporal()" title="Generar una al azar">🎲</button></div>
                         <select id="nu-rol"></select>
                         <button class="action-btn btn-validate-pdf" onclick="crearUsuario()">➕ Crear</button>
                     </div>
