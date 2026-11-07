@@ -60,15 +60,70 @@ function registrarAuditoria(idResultado, accion, detalle) {
 // =====================================================================
 let listenersActivos = false;
 
-auth.onAuthStateChanged(user => {
-    if (user) {
-        document.getElementById('login-screen').style.display = 'none';
-        iniciarListeners();
-    } else {
+// =====================================================================
+//  ROLES Y USUARIOS
+// =====================================================================
+const ROLES = {
+    admin: { nombre: "Administrador", vistas: ["admision", "validacion", "historial", "estadisticas", "inventario", "configuracion"] },
+    bioquimico: { nombre: "Bioquímico (valida)", vistas: ["admision", "validacion", "historial", "estadisticas", "inventario"] },
+    recepcion: { nombre: "Recepción", vistas: ["admision", "validacion", "historial"] },
+    consulta: { nombre: "Solo consulta", vistas: ["validacion", "historial", "estadisticas"] }
+};
+let miRol = null, miPerfil = null;
+function puedeValidar() { return miRol === "admin" || miRol === "bioquimico"; }
+function esAdmin() { return miRol === "admin"; }
+
+auth.onAuthStateChanged(async user => {
+    if (!user) {
+        miRol = null; miPerfil = null;
         document.getElementById('login-screen').style.display = 'flex';
-        detenerListeners();
+        document.getElementById('sin-rol-screen').style.display = 'none';
+        detenerListeners(); return;
     }
+    document.getElementById('login-screen').style.display = 'none';
+    try {
+        const bloq = (await db.ref("usuarios_bloqueados/" + user.uid).once("value")).val();
+        let perfil = (await db.ref("usuarios/" + user.uid).once("value")).val();
+        if (!perfil && !bloq) {
+            // Si todavía no existe ningún usuario registrado, el primero que entra queda como Administrador
+            const hay = (await db.ref("usuarios").limitToFirst(1).once("value")).exists();
+            if (!hay) {
+                perfil = { email: user.email, nombre: user.email.split("@")[0], rol: "admin", activo: true, creado: new Date().toISOString() };
+                await db.ref("usuarios/" + user.uid).set(perfil);
+            }
+        }
+        if (bloq || !perfil || perfil.activo === false || !ROLES[perfil.rol]) {
+            if (!perfil && !bloq) await db.ref("usuarios_solicitudes/" + user.uid).set({ email: user.email, fecha: new Date().toISOString() }).catch(() => { });
+            mostrarSinRol(user.email, bloq || (perfil && perfil.activo === false)); return;
+        }
+        miPerfil = perfil; miRol = perfil.rol;
+    } catch (e) {
+        mostrarSinRol(user.email, false, e.message); return;
+    }
+    aplicarRol();
+    iniciarListeners();
 });
+function mostrarSinRol(email, bloqueado, error) {
+    detenerListeners();
+    document.getElementById('sin-rol-email').innerText = email || "";
+    document.getElementById('sin-rol-msg').innerText = error ? "No se pudo verificar su usuario: " + error :
+        (bloqueado ? "Su usuario está DESACTIVADO. Consulte con el administrador del laboratorio." : "Su usuario todavía no tiene un rol asignado. Pida al administrador que lo apruebe en Configuración → Usuarios y luego vuelva a entrar.");
+    document.getElementById('sin-rol-screen').style.display = 'flex';
+}
+function aplicarRol() {
+    const permitidas = ROLES[miRol].vistas;
+    document.querySelectorAll('.nav-item').forEach(el => {
+        const m = (el.getAttribute('onclick') || "").match(/switchView\('(\w+)'/);
+        el.style.display = m && !permitidas.includes(m[1]) ? "none" : "";
+    });
+    document.body.classList.remove("rol-admin", "rol-bioquimico", "rol-recepcion", "rol-consulta");
+    document.body.classList.add("rol-" + miRol);
+    const et = document.getElementById('usuario-rol'); if (et) et.innerText = (miPerfil.nombre || miPerfil.email) + " · " + ROLES[miRol].nombre;
+    // Abre la primera vista permitida
+    const activa = document.querySelector('.view-section.active'); const actual = activa ? activa.id.replace("view-", "") : "";
+    if (!permitidas.includes(actual)) { const i = [...document.querySelectorAll('.nav-item')].find(el => el.style.display !== "none"); if (i) i.click(); }
+    if (esAdmin()) { iniciarPanelUsuarios(); document.getElementById('nu-rol').innerHTML = opcionesRol('recepcion'); }
+}
 
 function iniciarSesion() {
     const err = document.getElementById('login-error');
@@ -80,10 +135,11 @@ function iniciarSesion() {
         });
 }
 document.getElementById('login-pass').addEventListener('keydown', e => { if (e.key === 'Enter') iniciarSesion(); });
-function cerrarSesion() { auth.signOut(); }
+function cerrarSesion() { detenerPanelUsuarios(); auth.signOut(); }
 setInterval(() => { document.getElementById('reloj').innerText = new Date().toLocaleString(); }, 1000);
 
 function switchView(viewId, element) {
+    if (miRol && ROLES[miRol] && !ROLES[miRol].vistas.includes(viewId)) return mostrarToast("Sin permiso", "Su rol no tiene acceso a esta sección.");
     document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
     document.getElementById('view-' + viewId).classList.add('active');
@@ -1456,6 +1512,7 @@ window.buscarHistorialTabla = async function () {
 function filaHistorial(m, o, resultados) {
     o = o || {}; const keys = Object.keys(resultados);
     const pruebas = {}; // nombre -> estado
+    const valores = {}; // nombre -> "valor unidad"
     (o.examenes || []).forEach(n => pruebas[String(n).toUpperCase()] = "espera");
     let rechazado = false, primeraKey = keys[0] || null, fechaRes = null;
     keys.forEach(k => {
@@ -1463,7 +1520,7 @@ function filaHistorial(m, o, resultados) {
         if (!fechaRes && r.fecha_recepcion) fechaRes = r.fecha_recepcion;
         listaResultados(r).forEach(x => {
             const n = x.n.toUpperCase(); const est = r.estado === "Rechazado" ? "rechazado" : (pruebaValidada(r, n) ? "validado" : "pendiente");
-            if (pruebas[n] !== "validado") pruebas[n] = est;
+            if (pruebas[n] !== "validado") { pruebas[n] = est; valores[n] = (x.v + " " + x.u).trim(); }
         });
         if (r.estado !== "Rechazado" && (!resultados[primeraKey] || resultados[primeraKey].estado === "Rechazado")) primeraKey = k;
     });
@@ -1476,7 +1533,7 @@ function filaHistorial(m, o, resultados) {
         else estado = "Pendiente";
     }
     const fechaISO = o.fecha_creacion || fechaRes || "";
-    return { muestra: m, nombre: o.nombre_paciente || (keys.length ? nombreDeResultado(resultados[keys[0]]).nombre : "-"), ci: o.ci_paciente || "", fechaISO: fechaISO, pruebas: pruebas, estado: estado, key: primeraKey, medico: o.medico || "" };
+    return { muestra: m, nombre: o.nombre_paciente || (keys.length ? nombreDeResultado(resultados[keys[0]]).nombre : "-"), ci: o.ci_paciente || "", fechaISO: fechaISO, pruebas: pruebas, valores: valores, estado: estado, key: primeraKey, medico: o.medico || "" };
 }
 window.pintarHistorialTabla = function () {
     const filtro = document.getElementById('hist-estado').value;
@@ -1499,16 +1556,201 @@ window.abrirDesdeHistorial = function (key) {
     switchView('validacion', document.querySelectorAll('.nav-item')[1]);
     if (window.abrirEncontrado) abrirEncontrado(key);
 };
-window.exportarHistorialCSV = function () {
+// Exporta a Excel real (.xlsx) con cabecera formal. La librería se carga solo al usarla.
+function cargarScript(url) {
+    return new Promise((ok, mal) => { const sc = document.createElement("script"); sc.src = url; sc.onload = ok; sc.onerror = () => mal(new Error("No se pudo cargar " + url)); document.head.appendChild(sc); });
+}
+window.exportarHistorialCSV = async function () {
     if (!histFilas.length) return alert("Primero haga una búsqueda");
+    try { if (!window.ExcelJS) await cargarScript("https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"); }
+    catch (e) { return alert("No se pudo preparar el Excel. Revise su conexión a internet."); }
     const filtro = document.getElementById('hist-estado').value;
-    const q = v => '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
-    const lineas = [["Fecha", "Tubo", "Paciente", "CI", "Medico", "Pruebas", "Estado"].map(q).join(";")];
-    histFilas.filter(f => !filtro || f.estado === filtro).forEach(f => {
-        const d = f.fechaISO ? new Date(f.fechaISO) : null;
-        lineas.push([d && !isNaN(d) ? d.toLocaleString() : "", f.muestra, f.nombre, f.ci, f.medico, Object.keys(f.pruebas).map(n => n + "(" + f.pruebas[n] + ")").join(" "), f.estado].map(q).join(";"));
+    const filas = histFilas.filter(f => !filtro || f.estado === filtro);
+    const desde = document.getElementById('hist-desde').value, hasta = document.getElementById('hist-hasta').value;
+    const pac = document.getElementById('hist-paciente').value.trim(), tubo = document.getElementById('hist-tubo').value.trim();
+    const fmt = iso => { if (!iso) return ""; const [a, m, d] = iso.split("-"); return d + "/" + m + "/" + a; };
+
+    const AZUL = "FF0B4F8A", AZUL_CLARO = "FFE0F2FE", GRIS = "FFF8FAFC", BORDE = "FFCBD5E1";
+    const COLOR_ESTADO = { "Validado": ["FFDCFCE7", "FF166534"], "Parcial": ["FFE0F2FE", "FF075985"], "Pendiente": ["FFFEF3C7", "FF92400E"], "Rechazado": ["FFFEE2E2", "FF991B1B"], "Sin resultados": ["FFF1F5F9", "FF475569"] };
+    const borde = { top: { style: "thin", color: { argb: BORDE } }, left: { style: "thin", color: { argb: BORDE } }, bottom: { style: "thin", color: { argb: BORDE } }, right: { style: "thin", color: { argb: BORDE } } };
+
+    const wb = new ExcelJS.Workbook(); wb.creator = "AES O.S. Enterprise"; wb.created = new Date();
+
+    function encabezado(ws, titulo, nCols) {
+        const ultima = String.fromCharCode(64 + nCols);
+        ws.mergeCells("A1:" + ultima + "1"); ws.getCell("A1").value = (configLab.nombre || "Laboratorio Clínico").toUpperCase();
+        ws.getCell("A1").font = { name: "Calibri", size: 16, bold: true, color: { argb: "FFFFFFFF" } };
+        ws.getCell("A1").fill = { type: "pattern", pattern: "solid", fgColor: { argb: AZUL } };
+        ws.getCell("A1").alignment = { vertical: "middle", horizontal: "center" }; ws.getRow(1).height = 30;
+        ws.mergeCells("A2:" + ultima + "2"); ws.getCell("A2").value = [configLab.direccion, configLab.telefono ? "Tel. " + configLab.telefono : ""].filter(Boolean).join("  ·  ");
+        ws.getCell("A2").font = { size: 10, color: { argb: "FF475569" } }; ws.getCell("A2").alignment = { horizontal: "center" };
+        ws.mergeCells("A3:" + ultima + "3"); ws.getCell("A3").value = titulo;
+        ws.getCell("A3").font = { size: 13, bold: true, color: { argb: AZUL } }; ws.getCell("A3").alignment = { horizontal: "center" }; ws.getRow(3).height = 22;
+        const filtros = ["Período: " + (tubo || /^\d{4,}$/.test(pac) ? "todo el historial" : fmt(desde) + " al " + fmt(hasta))];
+        if (pac) filtros.push("Paciente: " + pac); if (tubo) filtros.push("Tubo: " + tubo); if (filtro) filtros.push("Estado: " + filtro);
+        ws.mergeCells("A4:" + ultima + "4"); ws.getCell("A4").value = filtros.join("   |   ");
+        ws.getCell("A4").font = { size: 10, italic: true }; ws.getCell("A4").alignment = { horizontal: "center" };
+        ws.mergeCells("A5:" + ultima + "5"); ws.getCell("A5").value = "Generado el " + new Date().toLocaleString() + " por " + usuarioActual();
+        ws.getCell("A5").font = { size: 9, color: { argb: "FF94A3B8" } }; ws.getCell("A5").alignment = { horizontal: "center" };
+    }
+    function cabecera(ws, fila, textos) {
+        const r = ws.getRow(fila); r.values = textos; r.height = 22;
+        r.eachCell(c => { c.font = { bold: true, color: { argb: "FFFFFFFF" } }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: AZUL } }; c.alignment = { vertical: "middle", horizontal: "center", wrapText: true }; c.border = borde; });
+    }
+    function pintarEstado(c, est) { const col = COLOR_ESTADO[est]; if (!col) return; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: col[0] } }; c.font = { bold: true, color: { argb: col[1] } }; c.alignment = { horizontal: "center", vertical: "middle" }; }
+
+    // ---- Hoja 1: Resumen por orden ----
+    const ws = wb.addWorksheet("Historial", { views: [{ state: "frozen", ySplit: 7 }], pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 } });
+    ws.columns = [{ width: 12 }, { width: 8 }, { width: 14 }, { width: 30 }, { width: 13 }, { width: 20 }, { width: 38 }, { width: 30 }, { width: 30 }, { width: 10 }, { width: 15 }];
+    encabezado(ws, "HISTORIAL DE ÓRDENES Y RESULTADOS", 11);
+    cabecera(ws, 7, ["Fecha", "Hora", "N° Tubo", "Paciente", "CI", "Médico", "Pruebas validadas", "Con resultado (sin validar)", "Esperando al equipo / Rechazadas", "Avance", "Estado"]);
+    filas.forEach((f, i) => {
+        const d = f.fechaISO ? new Date(f.fechaISO) : null; const ok = d && !isNaN(d);
+        const grupo = t => Object.keys(f.pruebas).filter(n => f.pruebas[n] === t);
+        const val = grupo("validado"), pen = grupo("pendiente"), esp = grupo("espera"), rec = grupo("rechazado");
+        const total = Object.keys(f.pruebas).length;
+        const r = ws.addRow([ok ? new Date(d.getTime() - d.getTimezoneOffset() * 60000) : "", ok ? d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "", f.muestra, f.nombre, f.ci, f.medico, val.join(", "), pen.join(", "), esp.join(", ") + (rec.length ? (esp.length ? " | " : "") + "Rech: " + rec.join(", ") : ""), total ? val.length + " / " + total : "-", f.estado]);
+        r.eachCell({ includeEmpty: true }, (c, col) => {
+            c.border = borde; c.alignment = { vertical: "middle", wrapText: col >= 7 && col <= 9, horizontal: [1, 2, 3, 5, 10].includes(col) ? "center" : "left" };
+            if (i % 2) c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: GRIS } };
+        });
+        r.getCell(1).numFmt = "dd/mm/yyyy"; r.getCell(3).font = { bold: true };
+        pintarEstado(r.getCell(11), f.estado);
     });
-    const blob = new Blob(["\ufeff" + lineas.join("\r\n")], { type: "text/csv;charset=utf-8" });
-    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "historial_" + document.getElementById('hist-desde').value + "_" + document.getElementById('hist-hasta').value + ".csv";
-    document.body.appendChild(a); a.click(); a.remove();
+    ws.autoFilter = { from: { row: 7, column: 1 }, to: { row: 7 + filas.length, column: 11 } };
+    // Totales
+    const cuenta = {}; filas.forEach(f => cuenta[f.estado] = (cuenta[f.estado] || 0) + 1);
+    let fr = ws.rowCount + 2;
+    ws.getCell("C" + fr).value = "RESUMEN"; ws.getCell("C" + fr).font = { bold: true, color: { argb: AZUL }, size: 12 };
+    [["Total de órdenes", filas.length]].concat(Object.keys(COLOR_ESTADO).filter(k => cuenta[k]).map(k => [k, cuenta[k]])).forEach((par, j) => {
+        const rr = ws.getRow(fr + 1 + j); rr.getCell(3).value = par[0]; rr.getCell(4).value = par[1];
+        [3, 4].forEach(c => { rr.getCell(c).border = borde; }); rr.getCell(4).alignment = { horizontal: "center" };
+        if (j === 0) { rr.getCell(3).font = { bold: true }; rr.getCell(4).font = { bold: true }; rr.getCell(3).fill = rr.getCell(4).fill = { type: "pattern", pattern: "solid", fgColor: { argb: AZUL_CLARO } }; }
+        else pintarEstado(rr.getCell(3), par[0]);
+    });
+
+    // ---- Hoja 2: Detalle por prueba (con el valor) ----
+    const ws2 = wb.addWorksheet("Detalle por prueba", { views: [{ state: "frozen", ySplit: 7 }], pageSetup: { orientation: "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 } });
+    ws2.columns = [{ width: 12 }, { width: 14 }, { width: 30 }, { width: 13 }, { width: 14 }, { width: 22 }, { width: 16 }];
+    encabezado(ws2, "DETALLE DE PRUEBAS", 7);
+    cabecera(ws2, 7, ["Fecha", "N° Tubo", "Paciente", "CI", "Prueba", "Resultado", "Estado"]);
+    const nombreEstado = { validado: "Validado", pendiente: "Pendiente", espera: "Sin resultados", rechazado: "Rechazado" };
+    let i2 = 0;
+    filas.forEach(f => {
+        const d = f.fechaISO ? new Date(f.fechaISO) : null; const ok = d && !isNaN(d);
+        Object.keys(f.pruebas).forEach(n => {
+            const est = nombreEstado[f.pruebas[n]];
+            const r = ws2.addRow([ok ? new Date(d.getTime() - d.getTimezoneOffset() * 60000) : "", f.muestra, f.nombre, f.ci, n, (f.valores || {})[n] || "", est === "Sin resultados" ? "En espera" : est]);
+            r.eachCell({ includeEmpty: true }, (c, col) => { c.border = borde; c.alignment = { vertical: "middle", horizontal: [1, 2, 4, 5, 6].includes(col) ? "center" : "left" }; if (i2 % 2) c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: GRIS } }; });
+            r.getCell(1).numFmt = "dd/mm/yyyy"; r.getCell(5).font = { bold: true }; pintarEstado(r.getCell(7), est); i2++;
+        });
+    });
+    ws2.autoFilter = { from: { row: 7, column: 1 }, to: { row: 7 + i2, column: 7 } };
+
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = "Historial_" + (tubo || pac || (desde + "_al_" + hasta)).replace(/[^\w\-]+/g, "_") + ".xlsx";
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 };
+
+
+// ---------- Panel de usuarios (solo Administrador) ----------
+let usuariosGlobal = {}, solicitudesGlobal = {}, bloqueadosGlobal = {}, panelUsuariosActivo = false;
+function iniciarPanelUsuarios() {
+    if (panelUsuariosActivo) return; panelUsuariosActivo = true;
+    db.ref("usuarios").on("value", s => { usuariosGlobal = s.val() || {}; renderizarUsuarios(); });
+    db.ref("usuarios_solicitudes").on("value", s => { solicitudesGlobal = s.val() || {}; renderizarUsuarios(); });
+    db.ref("usuarios_bloqueados").on("value", s => { bloqueadosGlobal = s.val() || {}; renderizarUsuarios(); });
+}
+function detenerPanelUsuarios() {
+    if (!panelUsuariosActivo) return; panelUsuariosActivo = false;
+    ["usuarios", "usuarios_solicitudes", "usuarios_bloqueados"].forEach(r => db.ref(r).off());
+}
+function opcionesRol(sel) { return Object.keys(ROLES).map(r => "<option value=\"" + r + "\"" + (r === sel ? " selected" : "") + ">" + ROLES[r].nombre + "</option>").join(""); }
+function renderizarUsuarios() {
+    const t = document.getElementById('tabla-usuarios'); if (!t) return;
+    const yo = auth.currentUser ? auth.currentUser.uid : "";
+    const filas = Object.keys(usuariosGlobal).sort((a, b) => String(usuariosGlobal[a].nombre || "").localeCompare(String(usuariosGlobal[b].nombre || ""))).map(uid => {
+        const u = usuariosGlobal[uid]; const activo = u.activo !== false && !bloqueadosGlobal[uid];
+        const esYo = uid === yo;
+        return "<tr" + (activo ? "" : " class=\"usuario-inactivo\"") + "><td><b>" + esc(u.nombre || "") + "</b>" + (esYo ? " <small>(usted)</small>" : "") + "</td><td>" + esc(u.email || "") + "</td>" +
+            "<td><select onchange=\"cambiarRolUsuario(" + jsArg(uid) + ", this.value)\"" + (esYo ? " disabled" : "") + ">" + opcionesRol(u.rol) + "</select></td>" +
+            "<td>" + (activo ? "<span class=\"status-pill val\">Activo</span>" : "<span class=\"status-pill rech\">Desactivado</span>") + "</td>" +
+            "<td class=\"acciones-usuario\">" + (esYo ? "" : "<button onclick=\"activarUsuario(" + jsArg(uid) + ", " + (!activo) + ")\">" + (activo ? "Desactivar" : "Activar") + "</button>") +
+            "<button onclick=\"resetearClave(" + jsArg(u.email || "") + ")\">Enviar cambio de contraseña</button></td></tr>";
+    }).join("");
+    t.innerHTML = filas || "<tr><td colspan=\"5\">Sin usuarios</td></tr>";
+    const sol = document.getElementById('tabla-solicitudes'), caja = document.getElementById('caja-solicitudes');
+    const ks = Object.keys(solicitudesGlobal).filter(uid => !usuariosGlobal[uid]);
+    caja.style.display = ks.length ? "block" : "none";
+    sol.innerHTML = ks.map(uid => "<tr><td>" + esc(solicitudesGlobal[uid].email) + "</td><td>" + esc(new Date(solicitudesGlobal[uid].fecha).toLocaleString()) + "</td><td><select id=\"sol-rol-" + esc(uid) + "\">" + opcionesRol("recepcion") + "</select></td><td class=\"acciones-usuario\"><button onclick=\"aprobarSolicitud(" + jsArg(uid) + ")\">✔ Aprobar</button><button onclick=\"db.ref('usuarios_solicitudes/' + " + jsArg(uid) + ").remove()\">Descartar</button></td></tr>").join("");
+}
+window.cambiarRolUsuario = async function (uid, rol) {
+    await db.ref("usuarios/" + uid + "/rol").set(rol);
+    db.ref("auditoria_usuarios").push({ accion: "Cambio de rol a " + rol, usuario_afectado: usuariosGlobal[uid].email, por: usuarioActual(), fecha: new Date().toISOString() });
+    mostrarToast("Rol actualizado", (usuariosGlobal[uid].nombre || "") + " → " + ROLES[rol].nombre);
+};
+window.activarUsuario = async function (uid, activar) {
+    const u = usuariosGlobal[uid];
+    if (!activar && !confirm("¿Desactivar a " + (u.nombre || u.email) + "? Ya no podrá entrar al sistema.")) return;
+    const upd = {}; upd["usuarios/" + uid + "/activo"] = activar; upd["usuarios_bloqueados/" + uid] = activar ? null : true;
+    await db.ref().update(upd);
+    db.ref("auditoria_usuarios").push({ accion: activar ? "Activado" : "Desactivado", usuario_afectado: u.email, por: usuarioActual(), fecha: new Date().toISOString() });
+};
+window.resetearClave = async function (email) {
+    if (!email) return;
+    try { await auth.sendPasswordResetEmail(email); alert("Se envió a " + email + " un correo para que elija una nueva contraseña (revise también la carpeta Spam)."); }
+    catch (e) { alert("No se pudo enviar: " + e.message); }
+};
+window.aprobarSolicitud = async function (uid) {
+    const s = solicitudesGlobal[uid]; const rol = document.getElementById("sol-rol-" + uid).value;
+    await db.ref("usuarios/" + uid).set({ email: s.email, nombre: s.email.split("@")[0], rol: rol, activo: true, creado: new Date().toISOString(), creado_por: usuarioActual() });
+    await db.ref("usuarios_solicitudes/" + uid).remove();
+    mostrarToast("Usuario aprobado", s.email + " ya puede entrar (debe volver a iniciar sesión).");
+};
+// Crear usuario nuevo SIN cerrar la sesión del administrador (usa una segunda conexión)
+window.crearUsuario = async function () {
+    const nombre = document.getElementById('nu-nombre').value.trim(), email = document.getElementById('nu-email').value.trim().toLowerCase();
+    const clave = document.getElementById('nu-clave').value, rol = document.getElementById('nu-rol').value;
+    const msg = document.getElementById('nu-msg');
+    if (!nombre || !email) return alert("Escriba nombre y correo");
+    if (clave.length < 6) return alert("La contraseña temporal debe tener al menos 6 caracteres");
+    msg.innerText = "Creando...";
+    let app2;
+    try {
+        app2 = firebase.apps.find(a => a.name === "altaUsuarios") || firebase.initializeApp(firebaseConfig, "altaUsuarios");
+        const cred = await app2.auth().createUserWithEmailAndPassword(email, clave);
+        const uid = cred.user.uid;
+        await app2.auth().signOut();
+        await db.ref("usuarios/" + uid).set({ email: email, nombre: nombre, rol: rol, activo: true, creado: new Date().toISOString(), creado_por: usuarioActual() });
+        db.ref("auditoria_usuarios").push({ accion: "Creado con rol " + rol, usuario_afectado: email, por: usuarioActual(), fecha: new Date().toISOString() });
+        ['nu-nombre', 'nu-email', 'nu-clave'].forEach(id => document.getElementById(id).value = "");
+        msg.innerText = "✔ Usuario creado. Entrégale su correo y la contraseña temporal; podrá cambiarla con 'Enviar cambio de contraseña'.";
+    } catch (e) {
+        const t = { "auth/email-already-in-use": "Ese correo ya tiene cuenta. Pídale que entre al LIS una vez: aparecerá abajo en 'Solicitudes pendientes' para aprobarlo.", "auth/invalid-email": "Correo no válido.", "auth/weak-password": "Contraseña muy débil (mínimo 6)." };
+        msg.innerText = "✖ " + (t[e.code] || e.message);
+    }
+};
+window.generarClaveTemporal = function () {
+    const c = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"; let x = "";
+    const r = crypto.getRandomValues(new Uint32Array(10)); r.forEach(n => x += c[n % c.length]);
+    document.getElementById('nu-clave').value = x; document.getElementById('nu-clave').type = "text";
+};
+
+// ---------- Permisos: se revisan también en el código, no solo ocultando botones ----------
+(function () {
+    const envolver = (nombres, permitido, texto) => nombres.forEach(n => {
+        const original = window[n]; if (typeof original !== "function") return;
+        window[n] = function () {
+            if (!permitido.apply(this, arguments)) { mostrarToast("Sin permiso", texto); return; }
+            return original.apply(this, arguments);
+        };
+    });
+    envolver(["validarPruebas", "validarSeleccionados", "validarArea", "validarYGenerarPDF", "revertirValidacion", "rechazarMuestra", "restaurarRechazado", "borrarRegistroLIS"],
+        () => puedeValidar(), "Solo un Bioquímico o el Administrador puede validar, rechazar o revertir.");
+    envolver(["descargarSoloPDF"], function (forzar) { return !forzar || puedeValidar(); }, "Solo un Bioquímico o el Administrador puede validar.");
+    envolver(["guardarPerfilLab", "guardarSeguro", "guardarPrueba", "guardarReferencia", "guardarConfigEntrega", "cambiarDiasVentana"],
+        () => esAdmin(), "Solo el Administrador puede cambiar la configuración.");
+    envolver(["guardarInventario", "eliminarInventario"], () => miRol === "admin" || miRol === "bioquimico", "Su rol no puede modificar el inventario.");
+})();
