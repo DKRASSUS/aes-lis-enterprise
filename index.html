@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AES O.S. Enterprise - LIS Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/estilos.css?v=6.1">
+    <link rel="stylesheet" href="css/estilos.css?v=6.2">
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
@@ -85,6 +85,7 @@
             <div class="nav-item" onclick="switchView('historial', this)">📋 Historial</div>
             <div class="nav-item" onclick="switchView('control', this)">🎯 Control de Calidad</div>
             <div class="nav-item" onclick="switchView('caja', this)">💰 Caja</div>
+            <div class="nav-item" onclick="switchView('facturacion', this)">🧾 Facturación</div>
             <div class="nav-item" onclick="switchView('estadisticas', this)">📊 Estadísticas</div>
             <div class="nav-item" onclick="switchView('inventario', this)">📦 Inventario</div>
             <div class="nav-item" onclick="switchView('monitoreo', this)" style="margin-top: 20px; border-top: 1px solid var(--border-color);">📡 Monitoreo</div>
@@ -125,6 +126,14 @@
                                     <div><label>Paga ahora (Bs)</label><input type="number" id="pago-monto" min="0" step="0.5" oninput="actualizarSaldoAdmision()"></div>
                                     <div><label>Forma de pago</label><select id="pago-metodo"><option>Efectivo</option><option>QR</option><option>Tarjeta</option><option>Transferencia</option><option>Seguro / Crédito</option></select></div>
                                     <div><label>Saldo</label><div id="pago-saldo" class="pago-saldo">0.00 Bs</div></div>
+                                </div>
+                                <div class="factura-admision">
+                                    <label class="chk-fact"><input type="checkbox" id="fac-requiere" onchange="toggleFactura()"> 🧾 Requiere factura</label>
+                                    <div id="fac-datos" style="display:none;">
+                                        <div><label>NIT / CI</label><input id="fac-nit"></div>
+                                        <div><label>Compl.</label><input id="fac-compl" placeholder="1A"></div>
+                                        <div style="grid-column: span 2;"><label>Razón social / Nombre</label><input id="fac-razon"></div>
+                                    </div>
                                 </div>
                             </div>
                             <button class="btn-success-adm" onclick="generarOrden()">💳 Generar Orden LIS</button>
@@ -219,6 +228,19 @@
                         </details>
                     </div>
                     <div class="panel" id="qc-detalle"><div class="empty-state" style="min-height:300px;"><h3>Elija un control</h3><p>A la izquierda, o agregue uno nuevo.</p></div></div>
+                </div>
+            </div>
+
+            <!-- VISTA: FACTURACIÓN -->
+            <div id="view-facturacion" class="view-section">
+                <div class="panel panel-blue">
+                    <h3 class="panel-title">🧾 Ventas a facturar</h3>
+                    <p style="font-size:0.85rem; color:#666; margin-top:0;">Mientras el LIS no esté conectado al SIAT: emita cada factura en el <b>Portal Web</b> o el <b>SIAT Desktop</b> del SIN con el botón 📋 (copia los datos) y luego márquela como emitida con su número. Así el LIS lleva el control de qué falta facturar.</p>
+                    <div class="caja-barra"><label>Desde</label><input type="date" id="fac-desde"><label>Hasta</label><input type="date" id="fac-hasta">
+                        <select id="fac-filtro" onchange="pintarFacturas()"><option value="">Todas</option><option>Pendiente</option><option>Emitida</option><option>Anulada</option></select>
+                        <button class="action-btn btn-validate-pdf" onclick="cargarFacturas()">🔍 Buscar</button><button class="action-btn" onclick="exportarVentasExcel()">⬇ Reporte de ventas (Excel)</button></div>
+                    <div id="fac-tarjetas" class="caja-tarjetas"></div>
+                    <div class="hist-tabla-caja" style="margin-top:12px;"><table class="results-table hist-tabla"><thead><tr><th>Fecha</th><th>Tubo</th><th>NIT/CI</th><th>Razón social</th><th style="text-align:right">Importe</th><th>Estado</th><th>N° factura / CUF</th><th>Acciones</th></tr></thead><tbody id="fac-cuerpo"></tbody></table></div>
                 </div>
             </div>
 
@@ -365,6 +387,62 @@
                     </div>
                 </div>
 
+                <!-- LABORATORIOS CLIENTES (solo Propietario, en el laboratorio principal) -->
+                <div class="panel panel-blue solo-propietario" style="margin-top: 20px; border-top-color:#F59E0B;">
+                    <h3 class="panel-title">🏢 Laboratorios clientes</h3>
+                    <p style="font-size:0.85rem; color:#666; margin-top:0;">Agregue aquí cada laboratorio que use el sistema. Antes cree su proyecto en Firebase (paso a paso en la guía) y pegue abajo el código que le da Firebase. No hace falta tocar GitHub.</p>
+                    <div class="qc-form" style="grid-template-columns: 1fr 2fr;">
+                        <div><label>Código corto (minúsculas, sin espacios)</label><input id="nl-codigo" placeholder="sanmartin"></div>
+                        <div><label>Nombre del laboratorio</label><input id="nl-nombre" placeholder="Laboratorio San Martín"></div>
+                    </div>
+                    <label class="lbl-peq">Pegue aquí lo que copió de Firebase (const firebaseConfig = {...})</label>
+                    <textarea id="nl-config" rows="5" class="inp-caja" style="font-family:Consolas,monospace; font-size:.82rem;" placeholder="const firebaseConfig = {&#10;  apiKey: &quot;AIza...&quot;, ..."></textarea>
+                    <label class="lbl-peq">databaseURL (solo si el código de arriba no lo trae)</label><input id="nl-dburl" class="inp-caja" placeholder="https://xxx-default-rtdb.firebaseio.com">
+                    <button class="action-btn btn-validate-pdf" style="margin-top:10px;" onclick="guardarLaboratorioCliente()">💾 Guardar laboratorio</button>
+                    <div id="nl-msg" style="margin-top:8px; font-size:.85rem;"></div>
+                    <table class="results-table" style="margin-top:12px;"><thead><tr><th>Laboratorio</th><th>Enlace del LIS</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="tabla-labs"></tbody></table>
+                </div>
+
+                <!-- INSTALACIÓN DEL MOTOR -->
+                <div class="panel panel-blue solo-admin" style="margin-top: 20px; border-top-color:#16A34A;">
+                    <h3 class="panel-title">📦 Preparar instalación del motor (PC del equipo)</h3>
+                    <p style="font-size:0.85rem; color:#666; margin-top:0;">Complete los datos y presione <b>Descargar archivo de instalación</b>. Ponga ese archivo junto a <code>INSTALAR_AES_LIS.bat</code> y el instalador hará todo solo, sin preguntas.</p>
+                    <div class="qc-form">
+                        <div><label>Laboratorio</label><select id="im-lab"></select></div>
+                        <div><label>Nombre de esta PC (para reconocerla)</label><input id="im-pc" placeholder="PC Inmunología"></div>
+                        <div><label>Usuario del motor (correo)</label><input id="im-correo" placeholder="motor@milab.lis"></div>
+                        <div><label>Contraseña del motor</label><div style="display:flex; gap:4px;"><input id="im-clave" type="text" autocomplete="off" style="flex:1"><button type="button" onclick="document.getElementById('im-clave').value=claveAzar(14)" title="Generar">🎲</button></div></div>
+                    </div>
+                    <label style="display:flex; gap:8px; align-items:center; margin-top:8px; font-size:.85rem;"><input type="checkbox" id="im-crear" checked style="width:18px; height:18px;"> Crear ese usuario del motor en Firebase ahora (si ya existe, solo se usa)</label>
+                    <h4 style="margin:14px 0 6px;">Equipos conectados a esa PC</h4>
+                    <div id="im-equipos"></div>
+                    <button type="button" class="btn-mini" onclick="agregarEquipoInstalador()">➕ Agregar equipo</button>
+                    <h4 style="margin:14px 0 6px;">Correo y copias de seguridad (opcional)</h4>
+                    <div class="qc-form">
+                        <div><label>Gmail que envía los resultados</label><input id="im-gmail" placeholder="laboratorio@gmail.com"></div>
+                        <div><label>Contraseña de aplicación (16 letras)</label><input id="im-gclave" placeholder="abcd efgh ijkl mnop"></div>
+                        <div><label>Nombre del remitente</label><input id="im-remitente" placeholder="Laboratorio Central"></div>
+                        <div><label>Hora de la copia diaria</label><input id="im-hora" value="23:30"></div>
+                    </div>
+                    <button class="action-btn btn-validate-pdf" style="margin-top:12px;" onclick="descargarInstalacion()">⬇ Descargar archivo de instalación</button>
+                    <p style="font-size:.78rem; color:#B45309; margin-bottom:0;">🔒 Ese archivo lleva contraseñas. El instalador lo borra solo al terminar. No lo envíe por WhatsApp ni lo deje en el USB.</p>
+                </div>
+
+                <!-- FACTURACIÓN: DATOS FISCALES DEL LABORATORIO -->
+                <div class="panel panel-blue solo-admin" style="margin-top: 20px; border-top-color:#7C3AED;">
+                    <h3 class="panel-title">🧾 Datos de facturación del laboratorio</h3>
+                    <div class="qc-form">
+                        <div><label>NIT del laboratorio</label><input id="fc-nit"></div>
+                        <div><label>Razón social</label><input id="fc-razon"></div>
+                        <div><label>Modalidad SIAT asignada</label><select id="fc-modalidad"><option>Portal Web en Línea</option><option>SIAT Desktop (aplicativo del SIN)</option><option>Computarizada en Línea</option><option>Electrónica en Línea</option><option>No factura todavía</option></select></div>
+                        <div><label>Código de actividad económica</label><input id="fc-actividad" placeholder="Ej: 869010"></div>
+                        <div><label>Código de producto SIN (servicio de laboratorio)</label><input id="fc-producto"></div>
+                        <div><label>Sucursal / Punto de venta</label><input id="fc-sucursal" placeholder="0 / 0"></div>
+                    </div>
+                    <label style="display:flex; gap:8px; align-items:center; margin-top:8px; font-size:.85rem;"><input type="checkbox" id="fc-defecto" style="width:18px; height:18px;"> Por defecto, todas las órdenes llevan factura</label>
+                    <button class="action-btn btn-validate-pdf" style="margin-top:10px;" onclick="guardarConfigFacturacion()">Guardar</button>
+                </div>
+
                 <!-- USUARIOS (solo administrador) -->
                 <div class="panel panel-blue solo-admin" style="margin-top: 20px;">
                     <h3 class="panel-title">👥 Usuarios y Roles</h3>
@@ -472,8 +550,8 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-    <script src="js/laboratorios.js?v=6.1"></script>
-    <script src="js/informe.js?v=6.1"></script>
-    <script src="js/app.js?v=6.1"></script>
+    <script src="js/laboratorios.js?v=6.2"></script>
+    <script src="js/informe.js?v=6.2"></script>
+    <script src="js/app.js?v=6.2"></script>
 </body>
 </html>
