@@ -127,14 +127,32 @@ function aplicarRol() {
 
 function iniciarSesion() {
     const err = document.getElementById('login-error');
-    err.style.display = 'none';
+    err.style.display = 'none'; err.style.color = 'red';
     auth.signInWithEmailAndPassword(document.getElementById('login-email').value.trim(), document.getElementById('login-pass').value)
         .catch(error => {
-            err.innerText = (error.code === "auth/network-request-failed") ? "Sin conexión a internet." : "Correo o contraseña incorrectos.";
+            const t = {
+                "auth/network-request-failed": "Sin conexión a internet.",
+                "auth/user-not-found": "Ese correo no tiene cuenta en este laboratorio.",
+                "auth/wrong-password": "Contraseña incorrecta.",
+                "auth/invalid-login-credentials": "Correo o contraseña incorrectos.",
+                "auth/invalid-credential": "Correo o contraseña incorrectos.",
+                "auth/invalid-email": "El correo está mal escrito.",
+                "auth/user-disabled": "Esta cuenta fue deshabilitada en Firebase.",
+                "auth/too-many-requests": "Demasiados intentos fallidos. Espere unos minutos o use '¿Olvidó su contraseña?'."
+            };
+            err.innerText = (t[error.code] || "No se pudo entrar") + "  [" + (error.code || error.message) + "]";
             err.style.display = 'block';
         });
 }
 document.getElementById('login-pass').addEventListener('keydown', e => { if (e.key === 'Enter') iniciarSesion(); });
+window.olvideClaveLogin = async function () {
+    const email = document.getElementById('login-email').value.trim();
+    const err = document.getElementById('login-error');
+    if (!email) { err.innerText = "Escriba primero su correo arriba y vuelva a presionar '¿Olvidó su contraseña?'."; err.style.display = 'block'; return; }
+    try { await auth.sendPasswordResetEmail(email); err.style.color = "#166534"; err.innerText = "Si ese correo tiene cuenta, le llegó un mensaje para crear una contraseña nueva. Revise también 'Correo no deseado' / Spam."; }
+    catch (e) { err.style.color = "red"; err.innerText = "No se pudo enviar [" + e.code + "]"; }
+    err.style.display = 'block';
+};
 function cerrarSesion() { detenerPanelUsuarios(); auth.signOut(); }
 setInterval(() => { document.getElementById('reloj').innerText = new Date().toLocaleString(); }, 1000);
 
@@ -1678,7 +1696,7 @@ function renderizarUsuarios() {
             "<td><select onchange=\"cambiarRolUsuario(" + jsArg(uid) + ", this.value)\"" + (esYo ? " disabled" : "") + ">" + opcionesRol(u.rol) + "</select></td>" +
             "<td>" + (activo ? "<span class=\"status-pill val\">Activo</span>" : "<span class=\"status-pill rech\">Desactivado</span>") + "</td>" +
             "<td class=\"acciones-usuario\">" + (esYo ? "" : "<button onclick=\"activarUsuario(" + jsArg(uid) + ", " + (!activo) + ")\">" + (activo ? "Desactivar" : "Activar") + "</button>") +
-            "<button onclick=\"resetearClave(" + jsArg(u.email || "") + ")\">Enviar cambio de contraseña</button></td></tr>";
+            "<button onclick=\"resetearClave(" + jsArg(u.email || "") + ")\">Enviar cambio de contraseña</button>" + (esYo ? "" : "<button onclick=\"quitarUsuario(" + jsArg(uid) + ")\" title=\"Quitar de la lista (también lo bloquea)\">🗑️</button>") + "</td></tr>";
     }).join("");
     t.innerHTML = filas || "<tr><td colspan=\"5\">Sin usuarios</td></tr>";
     const sol = document.getElementById('tabla-solicitudes'), caja = document.getElementById('caja-solicitudes');
@@ -1726,7 +1744,7 @@ window.crearUsuario = async function () {
         await db.ref("usuarios/" + uid).set({ email: email, nombre: nombre, rol: rol, activo: true, creado: new Date().toISOString(), creado_por: usuarioActual() });
         db.ref("auditoria_usuarios").push({ accion: "Creado con rol " + rol, usuario_afectado: email, por: usuarioActual(), fecha: new Date().toISOString() });
         ['nu-nombre', 'nu-email', 'nu-clave'].forEach(id => document.getElementById(id).value = "");
-        msg.innerText = "✔ Usuario creado. Entrégale su correo y la contraseña temporal; podrá cambiarla con 'Enviar cambio de contraseña'.";
+        msg.innerHTML = "✔ Usuario creado. Anote y entregue estos datos:<br><b>Correo:</b> " + esc(email) + "<br><b>Contraseña:</b> <code style=\"font-size:1.1em; background:#F1F5F9; padding:2px 6px;\">" + esc(clave) + "</code>";
     } catch (e) {
         const t = { "auth/email-already-in-use": "Ese correo ya tiene cuenta. Pídale que entre al LIS una vez: aparecerá abajo en 'Solicitudes pendientes' para aprobarlo.", "auth/invalid-email": "Correo no válido.", "auth/weak-password": "Contraseña muy débil (mínimo 6)." };
         msg.innerText = "✖ " + (t[e.code] || e.message);
@@ -1754,3 +1772,11 @@ window.generarClaveTemporal = function () {
         () => esAdmin(), "Solo el Administrador puede cambiar la configuración.");
     envolver(["guardarInventario", "eliminarInventario"], () => miRol === "admin" || miRol === "bioquimico", "Su rol no puede modificar el inventario.");
 })();
+
+window.quitarUsuario = async function (uid) {
+    const u = usuariosGlobal[uid] || {};
+    if (!confirm("¿Quitar a " + (u.nombre || u.email) + " de la lista? Quedará bloqueado. (Para borrar la cuenta del todo: Firebase → Authentication.)")) return;
+    const upd = {}; upd["usuarios/" + uid] = null; upd["usuarios_bloqueados/" + uid] = true;
+    await db.ref().update(upd);
+    db.ref("auditoria_usuarios").push({ accion: "Quitado de la lista", usuario_afectado: u.email || uid, por: usuarioActual(), fecha: new Date().toISOString() });
+};
