@@ -21,8 +21,9 @@ window.AESInforme = (function () {
         let h = "<div style=\"font-family:Inter,Helvetica,Arial,sans-serif;color:#333;font-size:12px;\">";
         // Encabezado
         h += "<div style=\"display:flex;justify-content:space-between;align-items:flex-end;border-bottom:4px solid " + azul + ";padding-bottom:12px;margin-bottom:14px;\">" +
+            "<div style=\"display:flex;align-items:center;gap:14px;\">" + (d.lab.logo ? "<img src=\"" + d.lab.logo + "\" style=\"max-height:64px;max-width:170px;\">" : "") +
             "<div><div style=\"font-size:24px;font-weight:800;color:" + oscuro + ";\">" + esc(d.lab.nombre || "Laboratorio Clínico") + "</div>" +
-            "<div style=\"font-size:11px;color:#666;\">" + esc([d.lab.direccion, d.lab.telefono].filter(Boolean).join(" · ")) + "</div></div>" +
+            "<div style=\"font-size:11px;color:#666;\">" + esc([d.lab.direccion, d.lab.telefono].filter(Boolean).join(" · ")) + "</div></div></div>" +
             "<div style=\"text-align:right;\"><div style=\"font-size:18px;font-weight:800;color:" + azul + ";\">" + (parcial ? "INFORME PARCIAL" : "INFORME DE RESULTADOS") + "</div>" +
             "<div style=\"font-size:11px;font-weight:bold;\">" + esc(fechaTexto(d.fecha)) + "</div></div></div>";
         // Datos del paciente
@@ -44,13 +45,25 @@ window.AESInforme = (function () {
                     "<td style=\"padding:7px 14px;border-bottom:1px solid #eee;font-family:monospace;font-size:13px;font-weight:bold;" + (x.flag ? "color:#DC2626;" : "") + "\">" + esc(x.v) + marca + "</td>" +
                     "<td style=\"padding:7px 14px;border-bottom:1px solid #eee;color:#666;\">" + esc(x.u || "-") + "</td>" +
                     "<td style=\"padding:7px 14px;border-bottom:1px solid #eee;color:#888;\">" + esc(x.ref) + "</td></tr>";
+                if (x.com) h += "<tr><td colspan=\"4\" style=\"padding:2px 14px 8px 28px;border-bottom:1px solid #eee;color:#555;font-style:italic;font-size:10.5px;\">Nota: " + esc(x.com) + "</td></tr>";
             });
             h += "</tbody></table>";
         });
+        if (d.observacion) h += "<div style=\"margin-top:14px;border:1px solid #E2E8F0;border-left:4px solid " + azul + ";background:#F8FAFC;padding:8px 12px;font-size:11px;\"><b>Observaciones:</b> " + esc(d.observacion) + "</div>";
+        // Firmas de quien validó
+        const firmas = (d.firmas || []).filter(f => f && f.nombre);
+        if (firmas.length) {
+            h += "<div style=\"display:flex;justify-content:flex-end;gap:28px;flex-wrap:wrap;margin-top:26px;page-break-inside:avoid;\">" + firmas.map(f =>
+                "<div style=\"text-align:center;min-width:190px;\"><div style=\"height:70px;display:flex;align-items:flex-end;justify-content:center;gap:6px;\">" +
+                (f.firma ? "<img src=\"" + f.firma + "\" style=\"max-height:66px;max-width:170px;\">" : "") + (f.sello ? "<img src=\"" + f.sello + "\" style=\"max-height:70px;max-width:110px;\">" : "") + "</div>" +
+                "<div style=\"border-top:1px solid #333;padding-top:3px;font-size:11px;font-weight:bold;\">" + esc(f.nombre) + "</div>" +
+                "<div style=\"font-size:10px;color:#555;\">" + esc([f.titulo, f.matricula].filter(Boolean).join(" · ")) + "</div></div>").join("") + "</div>";
+        }
         // Pie: validación + portal
-        h += "<div style=\"display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:22px;padding-top:10px;border-top:1px solid #E2E8F0;\">" +
-            "<div style=\"font-size:10px;color:#888;\">Los valores marcados con ▲ H (alto) o ▼ L (bajo) están fuera del rango de referencia.<br>" +
-            "<span style=\"font-size:11px;color:#333;\"><b>Validado por:</b> " + esc(d.validado_por || "-") + "</span></div>";
+        h += "<div style=\"display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:18px;padding-top:10px;border-top:1px solid #E2E8F0;\">" +
+            "<div style=\"font-size:10px;color:#888;\">Los valores marcados con ▲ H (alto) o ▼ L (bajo) están fuera del rango de referencia." +
+            (firmas.length ? "" : "<br><span style=\"font-size:11px;color:#333;\"><b>Validado por:</b> " + esc(d.validado_por || "-") + "</span>") +
+            (d.lab.pie ? "<br>" + esc(d.lab.pie) : "") + "</div>";
         if (extra.qr || extra.portal) {
             h += "<div style=\"display:flex;align-items:center;gap:10px;text-align:right;font-size:10px;color:#555;\">" +
                 "<div><b>Vea sus resultados en línea</b><br>Escanee el código o entre a:<br><span style=\"color:" + azul + ";\">" + esc(extra.portal || "") + "</span>" +

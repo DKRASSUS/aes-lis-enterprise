@@ -58,10 +58,10 @@ let listenersActivos = false;
 //  ROLES Y USUARIOS
 // =====================================================================
 const ROLES = {
-    admin: { nombre: "Administrador", vistas: ["admision", "validacion", "historial", "caja", "estadisticas", "inventario", "monitoreo", "configuracion"] },
-    bioquimico: { nombre: "Bioquímico (valida)", vistas: ["admision", "validacion", "historial", "estadisticas", "inventario"] },
+    admin: { nombre: "Administrador", vistas: ["admision", "validacion", "historial", "control", "caja", "estadisticas", "inventario", "monitoreo", "configuracion"] },
+    bioquimico: { nombre: "Bioquímico (valida)", vistas: ["admision", "validacion", "historial", "control", "estadisticas", "inventario"] },
     recepcion: { nombre: "Recepción", vistas: ["admision", "validacion", "historial", "caja"] },
-    consulta: { nombre: "Solo consulta", vistas: ["validacion", "historial", "estadisticas"] }
+    consulta: { nombre: "Solo consulta", vistas: ["validacion", "historial", "control", "estadisticas"] }
 };
 let miRol = null, miPerfil = null;
 function puedeValidar() { return miRol === "admin" || miRol === "bioquimico"; }
@@ -97,6 +97,8 @@ auth.onAuthStateChanged(async user => {
     }
     aplicarRol();
     iniciarListeners();
+    iniciarQC();
+    iniciarFirmas();
 });
 function mostrarSinRol(email, bloqueado, error) {
     detenerListeners();
@@ -148,7 +150,7 @@ window.olvideClaveLogin = async function () {
     catch (e) { err.style.color = "red"; err.innerText = "No se pudo enviar [" + e.code + "]"; }
     err.style.display = 'block';
 };
-function cerrarSesion() { detenerPanelUsuarios(); detenerMonitoreo(); if (cajaRef) cajaRef.off(); auth.signOut(); }
+function cerrarSesion() { detenerPanelUsuarios(); detenerMonitoreo(); detenerQC(); if (cajaRef) cajaRef.off(); auth.signOut(); }
 setInterval(() => { document.getElementById('reloj').innerText = new Date().toLocaleString(); }, 1000);
 
 function switchView(viewId, element) {
@@ -160,6 +162,7 @@ function switchView(viewId, element) {
 
     if (viewId === 'historial' && !document.getElementById('hist-desde').value) semanaHistorial();
     if (viewId === 'caja') cargarCaja();
+    if (viewId === 'control') { iniciarQC(); pintarListaQC(); }
     if (viewId === 'monitoreo') { iniciarMonitoreo(); pintarMonitoreo(); }
     if (viewId === 'estadisticas') {
         const hoy = new Date();
@@ -268,7 +271,7 @@ function iniciarListeners() {
             configEntrega = data.entrega || { auto_correo: false };
             renderizarConfiguracion(); actualizarSelectSeguros(); renderizarReferencias(); renderizarConfigEntrega();
             // Copia pública (solo nombre y contacto) para el encabezado del portal del paciente
-            db.ref("portal_publico/laboratorio").set({ nombre: configLab.nombre || "", telefono: configLab.telefono || "", direccion: configLab.direccion || "" }).catch(() => { });
+            db.ref("portal_publico/laboratorio").set({ nombre: configLab.nombre || "", telefono: configLab.telefono || "", direccion: configLab.direccion || "", pie: configLab.pie || "", logo: configLab.logo || null }).catch(() => { });
         } else {
             db.ref("configuracion").set({ seguros: { "Particular": 0 }, precios: { "GLU": 25 }, laboratorio: configLab });
         }
@@ -312,9 +315,13 @@ function guardarPerfilLab() {
     const n = document.getElementById('conf-lab-nombre').value.trim();
     const t = document.getElementById('conf-lab-telefono').value.trim();
     const d = document.getElementById('conf-lab-direccion').value.trim();
+    const pie = document.getElementById('conf-lab-pie').value.trim();
     if (!n) return alert("El nombre del laboratorio es obligatorio.");
-    db.ref("configuracion/laboratorio").set({ nombre: n, telefono: t, direccion: d });
-    db.ref("portal_publico/laboratorio").set({ nombre: n, telefono: t, direccion: d });
+    const logo = imagenesPendientes.logo !== undefined ? imagenesPendientes.logo : (configLab.logo || "");
+    const datos = { nombre: n, telefono: t, direccion: d, pie: pie, logo: logo || null };
+    db.ref("configuracion/laboratorio").set(datos);
+    db.ref("portal_publico/laboratorio").set(datos);
+    delete imagenesPendientes.logo;
     mostrarToast("Perfil Actualizado", "Datos del laboratorio guardados.");
 }
 
@@ -340,6 +347,8 @@ function renderizarConfiguracion() {
     document.getElementById('conf-lab-nombre').value = configLab.nombre || "";
     document.getElementById('conf-lab-telefono').value = configLab.telefono || "";
     document.getElementById('conf-lab-direccion').value = configLab.direccion || "";
+    document.getElementById('conf-lab-pie').value = configLab.pie || "";
+    if (imagenesPendientes.logo === undefined) mostrarPrev("logo", configLab.logo);
 
     let hs = "";
     Object.keys(configSeguros).forEach(nombre => { hs += "<tr><td>" + esc(nombre) + "</td><td>" + esc(configSeguros[nombre]) + "%</td><td><button onclick=\"eliminarSeguro(" + jsArg(nombre) + ")\" style=\"color:red; background:none; border:none; cursor:pointer;\">🗑️</button></td></tr>"; });
@@ -854,10 +863,11 @@ function datosInforme(key, soloValidados) {
         if (flag) anormales++;
         const cat = categoriaDe(x.n);
         const vinfo = (r.validados || {})[String(x.n).toUpperCase()] || {};
-        (grupos[cat] = grupos[cat] || []).push({ n: x.n, v: x.v, u: x.u || ref.unidad, ref: ref.texto, flag: flag, val: val, vpor: vinfo.por || r.validado_por || "", vfecha: vinfo.fecha || r.fecha_validacion || "" });
+        (grupos[cat] = grupos[cat] || []).push({ n: x.n, v: x.v, u: x.u || ref.unidad, ref: ref.texto, flag: flag, val: val, vpor: vinfo.por || r.validado_por || "", vfecha: vinfo.fecha || r.fecha_validacion || "", com: (r.comentarios || {})[String(x.n).toUpperCase()] || "" });
     });
     return {
-        lab: { nombre: configLab.nombre || "Laboratorio Clínico", direccion: configLab.direccion || "", telefono: configLab.telefono || "" },
+        lab: { nombre: configLab.nombre || "Laboratorio Clínico", direccion: configLab.direccion || "", telefono: configLab.telefono || "", pie: configLab.pie || "", logo: configLab.logo || "" },
+        observacion: r.observacion || "", firmas: firmasDe([r.validado_por]),
         paciente: info.nombre, huerfano: info.huerfano, ci: o ? o.ci_paciente : (r.ci || ""),
         edad: calcularEdad(o ? o.fecha_nac : ""), sexo: genero === "F" ? "Femenino" : (genero === "M" ? "Masculino" : "-"),
         medico: (o && o.medico) ? o.medico : "-", muestra: r.muestra || "N/A", equipo: r.equipo || "N/A",
@@ -888,10 +898,11 @@ function datosInformeTubo(key, forzarValidacion) {
         if (r.equipo && Object.keys(d.grupos).length) equipos.add(r.equipo);
     });
     const grupos = {}; let anormales = 0;
-    orden.forEach(id => { const x = filas[id]; if (x.flag) anormales++; (grupos[x.cat] = grupos[x.cat] || []).push({ n: x.n, v: x.v, u: x.u, ref: x.ref, flag: x.flag }); });
+    orden.forEach(id => { const x = filas[id]; if (x.flag) anormales++; (grupos[x.cat] = grupos[x.cat] || []).push({ n: x.n, v: x.v, u: x.u, ref: x.ref, flag: x.flag, com: x.com || "" }); });
+    base.observacion = Array.from(new Set(keys.map(k => datosGlobales[k].observacion).filter(Boolean))).join(" ");
     const listos = new Set(orden);
     base.grupos = grupos; base.anormales = anormales;
-    base.fecha = ultima; base.validado_por = Array.from(validadores).join(", ");
+    base.fecha = ultima; base.validado_por = Array.from(validadores).join(", "); base.firmas = firmasDe(Array.from(validadores));
     base.equipo = Array.from(equipos).join(", ") || base.equipo;
     base.pendientes = (base.examenes_web || []).filter(e => !listos.has(String(e).toUpperCase()));
     return base;
@@ -920,6 +931,13 @@ function mostrarDetalle(key) {
     document.getElementById("detalle-equipo").innerText = d.equipo;
 
     let hT = "";
+    if (r.estado !== "Validado_Final" && r.estado !== "Rechazado") {
+        const avisos = listaResultados(r).map(x => ({ n: x.n, e: estadoQCHoy(x.n) })).filter(a => a.e && a.e !== "Aceptado");
+        const rech = avisos.filter(a => a.e === "Rechazado").map(a => a.n), sin = avisos.filter(a => a.e === "Sin control hoy").map(a => a.n), adv = avisos.filter(a => a.e === "Advertencia").map(a => a.n);
+        if (rech.length) hT += "<tr><td colspan=\"4\"><div class=\"qc-aviso\">✖ <b>Control de calidad RECHAZADO hoy:</b> " + esc(rech.join(", ")) + ". No libere estas pruebas hasta corregir.</div></td></tr>";
+        if (sin.length) hT += "<tr><td colspan=\"4\"><div class=\"qc-aviso adv\">⚠ <b>Sin control de calidad hoy:</b> " + esc(sin.join(", ")) + "</div></td></tr>";
+        if (adv.length) hT += "<tr><td colspan=\"4\"><div class=\"qc-aviso adv\">⚠ Control con advertencia (1-2s): " + esc(adv.join(", ")) + "</div></td></tr>";
+    }
     if (r.estado === "Rechazado") hT += "<tr><td colspan=\"4\" class=\"aviso-rechazo\"><strong>Motivo de rechazo:</strong> " + esc(r.motivo_rechazo || "-") + " — " + esc(r.rechazado_por || "") + "</td></tr>";
     if (d.anormales > 0) hT += "<tr><td colspan=\"4\" class=\"aviso-anormal\">⚠️ " + d.anormales + " resultado(s) fuera del rango de referencia</td></tr>";
     if (!d.huerfano) hT += "<tr><td colspan=\"4\" style=\"background: #FFFBEB; padding: 10px; color: #B45309; font-size: 0.8rem;\"><strong>Pruebas solicitadas en Web:</strong> " + esc(d.examenes_web.join(", ")) + "</td></tr>";
@@ -932,10 +950,14 @@ function mostrarDetalle(key) {
         d.grupos[cat].forEach(x => {
             const flagHtml = x.flag === "H" ? " <span class=\"flag flag-h\">▲ H</span>" : (x.flag === "L" ? " <span class=\"flag flag-l\">▼ L</span>" : "");
             const marca = !editable ? "" : (x.val ? "<span class=\"ok-val\" title=\"Validado por " + esc(x.vpor) + "\">✔</span> " : "<input type=\"checkbox\" class=\"chk-val\" data-p=\"" + esc(x.n) + "\"> ");
-            hT += "<tr class=\"" + (x.flag ? "fila-anormal" : "") + (editable && x.val ? " fila-validada" : "") + "\"><td style=\"padding-left: 20px;\">" + marca + "<strong>" + esc(x.n) + "</strong></td><td style=\"font-family: monospace; font-size:1.1rem;\">" + esc(x.v) + flagHtml + "</td><td><span class=\"unit-badge\">" + esc(x.u || '-') + "</span></td><td style=\"color:#64748B; font-size:0.85rem;\">" + esc(x.ref) + "</td></tr>";
+            const btnCom = puedeValidar() ? "<button class=\"btn-com" + (x.com ? " tiene" : "") + "\" title=\"Comentario para el informe\" onclick=\"comentarPrueba(" + jsArg(x.n) + ")\">💬</button>" : "";
+            hT += "<tr class=\"" + (x.flag ? "fila-anormal" : "") + (editable && x.val ? " fila-validada" : "") + "\"><td style=\"padding-left: 20px;\">" + marca + "<strong>" + esc(x.n) + "</strong>" + btnCom + "</td><td style=\"font-family: monospace; font-size:1.1rem;\">" + esc(x.v) + flagHtml + "</td><td><span class=\"unit-badge\">" + esc(x.u || '-') + "</span></td><td style=\"color:#64748B; font-size:0.85rem;\">" + esc(x.ref) + "</td></tr>";
+            if (x.com) hT += "<tr class=\"com-fila\"><td colspan=\"4\" style=\"padding-left:44px;\">💬 " + esc(x.com) + "</td></tr>";
         });
     });
     document.getElementById("tabla-analitos").innerHTML = hT;
+    const obs = document.getElementById('obs-general');
+    if (obs) { if (document.activeElement !== obs) obs.value = r.observacion || ""; obs.disabled = !puedeValidar(); }
     renderizarAuditoria(r);
     if (estado === "Validado_Final") renderizarEntrega(key);
 }
@@ -1011,7 +1033,10 @@ async function validarPruebas(lista) {
     const key = pacienteSeleccionadoId; const r = datosGlobales[key]; if (!r) return;
     lista = Array.from(new Set(lista)).filter(n => !pruebaValidada(r, n));
     if (!lista.length) return alert("Marque al menos una prueba que no esté validada.");
+    const qcMal = lista.filter(n => estadoQCHoy(n) === "Rechazado");
+    if (qcMal.length && !confirm("⚠️ ATENCIÓN: el control de calidad de " + qcMal.join(", ") + " está RECHAZADO hoy.\n\n¿Liberar igual estos resultados? (quedará registrado)")) return;
     if (!confirm("¿Validar y liberar al paciente: " + lista.join(", ") + "?")) return;
+    if (qcMal.length) registrarAuditoria(key, "Validado con control rechazado", qcMal.join(", "));
     const ahora = new Date().toISOString(), por = usuarioActual(), upd = {};
     lista.forEach(n => upd["validados/" + String(n).toUpperCase()] = { por: por, fecha: ahora });
     await db.ref("resultados/" + key).update(upd);
@@ -1103,6 +1128,7 @@ async function publicarOrdenEnPortal(muestra, ordenDirecta) {
     const acc = await asegurarAccesoPortal(o.ci_paciente);
     const validados = Object.keys(datosGlobales).filter(k => datosGlobales[k].muestra === muestra && (datosGlobales[k].estado === "Validado_Final" || datosGlobales[k].validados));
     const d = validados.length ? datosInformeTubo(validados[0]) : null;
+    if (d && d.lab) delete d.lab.logo;   // el portal toma el logo de portal_publico (no se repite en cada informe)
     const listos = new Set();
     if (d) Object.values(d.grupos).forEach(g => g.forEach(x => listos.add(x.n.toUpperCase())));
     const examenes = (o.examenes || []).map(e => ({ codigo: e, estado: listos.has(String(e).toUpperCase()) ? "listo" : "pendiente" }));
@@ -2032,3 +2058,235 @@ function pintarMonitoreo() {
     document.getElementById('mon-correos').innerHTML = ks.length ? "<table class=\"results-table\"><thead><tr><th>Fecha</th><th>Para</th><th>Asunto</th><th>Error</th><th></th></tr></thead><tbody>" + ks.map(k => { const c = monCorreosErr[k]; return "<tr><td>" + esc(new Date(c.creado).toLocaleString()) + "</td><td>" + esc(c.para) + "</td><td>" + esc(c.asunto || "") + "</td><td style=\"color:#B91C1C\">" + esc(c.error || "") + "</td><td><button class=\"btn-mini\" onclick=\"reintentarCorreo(" + jsArg(k) + ")\">Reintentar</button> <button class=\"btn-mini\" onclick=\"db.ref('cola_correos/' + " + jsArg(k) + ").remove()\">Descartar</button></td></tr>"; }).join("") + "</tbody></table>" : "<p style=\"color:#166534\">✔ Sin errores.</p>";
 }
 window.reintentarCorreo = function (k) { db.ref("cola_correos/" + k).update({ estado: "pendiente", intentos: 0, error: null }); mostrarToast("Reintentando", "El motor lo enviará en unos segundos."); };
+
+// =====================================================================
+//  CONTROL DE CALIDAD  (Levey-Jennings + reglas de Westgard)
+// =====================================================================
+let qcMateriales = {}, qcUltimo = {}, qcSel = null, qcRegs = {}, qcRegRef = null, qcActivo = false;
+function iniciarQC() {
+    if (qcActivo) return; qcActivo = true;
+    db.ref("control_calidad/materiales").on("value", s => { qcMateriales = s.val() || {}; pintarListaQC(); if (qcSel) pintarDetalleQC(); });
+    db.ref("control_calidad/ultimo").on("value", s => { qcUltimo = s.val() || {}; pintarListaQC(); });
+}
+function detenerQC() { if (!qcActivo) return; qcActivo = false; db.ref("control_calidad/materiales").off(); db.ref("control_calidad/ultimo").off(); if (qcRegRef) qcRegRef.off(); }
+// Estado del control HOY por prueba (lo usa Validación para avisar)
+function estadoQCHoy(prueba) {
+    const hoy = fechaLocalISO(); let peor = null;
+    Object.keys(qcMateriales).forEach(id => {
+        const m = qcMateriales[id]; if (m.activo === false || String(m.prueba).toUpperCase() !== String(prueba).toUpperCase()) return;
+        const u = qcUltimo[id]; const e = (u && u.dia === hoy) ? u.estado : "Sin control hoy";
+        const orden = { "Rechazado": 3, "Sin control hoy": 2, "Advertencia": 1, "Aceptado": 0 };
+        if (peor === null || orden[e] > orden[peor]) peor = e;
+    });
+    return peor; // null = esa prueba no tiene controles cargados
+}
+function claseEstadoQC(e) { return { "Aceptado": "ok", "Advertencia": "adv", "Rechazado": "rech" }[e] || "nada"; }
+function iconoEstadoQC(e) { return { "Aceptado": "✔", "Advertencia": "⚠", "Rechazado": "✖" }[e] || "•"; }
+function pintarListaQC() {
+    const el = document.getElementById('qc-lista'); if (!el) return;
+    const hoy = fechaLocalISO();
+    const ids = Object.keys(qcMateriales).sort((a, b) => (qcMateriales[a].prueba + qcMateriales[a].nivel).localeCompare(qcMateriales[b].prueba + qcMateriales[b].nivel));
+    el.innerHTML = ids.length ? ids.map(id => {
+        const m = qcMateriales[id], u = qcUltimo[id]; const e = (u && u.dia === hoy) ? u.estado : "Sin control hoy";
+        const vencido = m.vence && m.vence < hoy;
+        return "<div class=\"qc-item" + (qcSel === id ? " activo" : "") + "\" onclick=\"abrirQC(" + jsArg(id) + ")\" style=\"" + (m.activo === false ? "opacity:.5;" : "") + "\"><div><b>" + esc(m.prueba) + "</b> · " + esc(m.nivel) + "<div class=\"s\">Lote " + esc(m.lote || "-") + (m.equipo ? " · " + esc(m.equipo) : "") + (vencido ? " · <b style=\"color:#B91C1C\">VENCIDO</b>" : "") + "</div></div><span class=\"qc-est " + claseEstadoQC(e) + "\">" + iconoEstadoQC(e) + " " + esc(e) + "</span></div>";
+    }).join("") : "<p style=\"color:#888; font-size:0.9rem;\">Todavía no hay controles. Agregue el primero abajo.</p>";
+}
+window.guardarMaterialQC = async function () {
+    if (!puedeValidar()) return mostrarToast("Sin permiso", "Solo Bioquímico o Administrador.");
+    const g = id => document.getElementById(id).value.trim();
+    const m = { prueba: g('qcn-prueba').toUpperCase(), nivel: g('qcn-nivel'), lote: g('qcn-lote'), vence: g('qcn-vence'), media: num(g('qcn-media')), de: num(g('qcn-de')), unidad: g('qcn-unidad'), equipo: g('qcn-equipo'), activo: true, creado: new Date().toISOString(), creado_por: usuarioActual() };
+    if (!m.prueba) return alert("Escriba el código de la prueba (ej: GLU)");
+    if (!(m.media > 0) || !(m.de > 0)) return alert("Escriba la media y la DE del inserto del control (números mayores a 0).\nSi aún no las tiene, ponga valores aproximados y luego use 'Calcular con mis datos'.");
+    const ref = await db.ref("control_calidad/materiales").push(m);
+    ['qcn-prueba', 'qcn-lote', 'qcn-vence', 'qcn-media', 'qcn-de', 'qcn-unidad'].forEach(i => document.getElementById(i).value = "");
+    document.getElementById('qc-nuevo-box').open = false;
+    abrirQC(ref.key);
+};
+window.abrirQC = function (id) {
+    qcSel = id; pintarListaQC();
+    if (qcRegRef) qcRegRef.off();
+    qcRegRef = db.ref("control_calidad/registros/" + id).limitToLast(60);
+    qcRegRef.on("value", s => { qcRegs = s.val() || {}; pintarDetalleQC(); });
+};
+function listaRegsQC() { return Object.keys(qcRegs).map(k => Object.assign({ key: k }, qcRegs[k])).sort((a, b) => String(a.fecha).localeCompare(String(b.fecha))); }
+// --- Reglas de Westgard sobre la serie (último punto contra los anteriores) ---
+function evaluarWestgard(previos, z) {
+    const r = [], zs = previos.filter(x => !x.excluido).map(x => x.z).concat([z]);
+    const n = zs.length, ult = k => zs.slice(-k);
+    if (Math.abs(z) > 3) r.push({ regla: "1-3s", tipo: "rech", texto: "Un valor fuera de ±3 DE (error aleatorio)" });
+    if (n >= 2 && ult(2).every(v => v > 2) || n >= 2 && ult(2).every(v => v < -2)) r.push({ regla: "2-2s", tipo: "rech", texto: "Dos valores seguidos fuera de 2 DE del mismo lado (error sistemático)" });
+    if (n >= 2 && Math.abs(ult(2)[0] - ult(2)[1]) > 4 && Math.sign(ult(2)[0]) !== Math.sign(ult(2)[1]) && ult(2).every(v => Math.abs(v) > 2)) r.push({ regla: "R-4s", tipo: "rech", texto: "Diferencia mayor a 4 DE entre dos valores seguidos (error aleatorio)" });
+    if (n >= 4 && (ult(4).every(v => v > 1) || ult(4).every(v => v < -1))) r.push({ regla: "4-1s", tipo: "rech", texto: "Cuatro valores seguidos fuera de 1 DE del mismo lado (error sistemático)" });
+    if (n >= 10 && (ult(10).every(v => v > 0) || ult(10).every(v => v < 0))) r.push({ regla: "10x", tipo: "rech", texto: "Diez valores seguidos del mismo lado de la media (desvío / tendencia)" });
+    if (!r.length && Math.abs(z) > 2) r.push({ regla: "1-2s", tipo: "adv", texto: "Un valor fuera de ±2 DE: advertencia, revise las demás reglas" });
+    return { reglas: r, estado: r.some(x => x.tipo === "rech") ? "Rechazado" : (r.length ? "Advertencia" : "Aceptado") };
+}
+window.registrarQC = async function () {
+    if (!puedeValidar()) return mostrarToast("Sin permiso", "Solo Bioquímico o Administrador.");
+    const m = qcMateriales[qcSel]; const v = num(document.getElementById('qc-valor').value);
+    if (v === null) return alert("Escriba el valor del control");
+    const z = (v - m.media) / m.de;
+    const ev = evaluarWestgard(listaRegsQC(), z);
+    const ahora = new Date();
+    const reg = { fecha: ahora.toISOString(), dia: fechaLocalISO(ahora), valor: v, z: +z.toFixed(3), estado: ev.estado, reglas: ev.reglas.map(x => x.regla).join(", "), por: usuarioActual(), media: m.media, de: m.de };
+    await db.ref("control_calidad/registros/" + qcSel).push(reg);
+    await db.ref("control_calidad/ultimo/" + qcSel).set({ dia: reg.dia, estado: reg.estado, valor: v, fecha: reg.fecha, reglas: reg.reglas });
+    document.getElementById('qc-valor').value = "";
+    if (ev.estado === "Rechazado") alert("✖ CONTROL RECHAZADO — " + m.prueba + " " + m.nivel + "\n\n" + ev.reglas.map(x => "• " + x.regla + ": " + x.texto).join("\n") + "\n\nNo libere resultados de " + m.prueba + " hasta corregir (recalibrar, revisar reactivo, repetir el control). Anote la acción correctiva en la tabla.");
+    else if (ev.estado === "Advertencia") mostrarToast("⚠ Advertencia " + m.prueba, ev.reglas[0].texto);
+    else mostrarToast("✔ Control aceptado", m.prueba + " " + m.nivel + ": " + v);
+};
+window.accionCorrectivaQC = function (k) {
+    const t = prompt("Acción correctiva (ej: se recalibró y se repitió el control):", (qcRegs[k] && qcRegs[k].accion) || "");
+    if (t === null) return;
+    db.ref("control_calidad/registros/" + qcSel + "/" + k).update({ accion: t, accion_por: usuarioActual() });
+};
+window.excluirQC = function (k) {
+    const r = qcRegs[k]; if (!r) return;
+    db.ref("control_calidad/registros/" + qcSel + "/" + k).update({ excluido: !r.excluido });
+};
+window.recalcularQC = function () {
+    const vals = listaRegsQC().filter(x => !x.excluido && x.estado !== "Rechazado").map(x => x.valor);
+    if (vals.length < 20) return alert("Se necesitan al menos 20 valores aceptados (tiene " + vals.length + "). Mientras tanto use la media y DE del inserto.");
+    const media = vals.reduce((a, b) => a + b, 0) / vals.length;
+    const de = Math.sqrt(vals.reduce((a, b) => a + (b - media) ** 2, 0) / (vals.length - 1));
+    if (!confirm("Con sus últimos " + vals.length + " valores:\nMedia = " + media.toFixed(3) + "\nDE = " + de.toFixed(3) + " (CV " + (de / media * 100).toFixed(1) + " %)\n\n¿Usar estos valores desde ahora?")) return;
+    db.ref("control_calidad/materiales/" + qcSel).update({ media: +media.toFixed(4), de: +de.toFixed(4), recalculado: new Date().toISOString(), recalculado_por: usuarioActual() });
+};
+window.desactivarQC = function () {
+    const m = qcMateriales[qcSel]; if (!confirm((m.activo === false ? "¿Reactivar" : "¿Dar de baja") + " el control " + m.prueba + " " + m.nivel + " lote " + m.lote + "?")) return;
+    db.ref("control_calidad/materiales/" + qcSel + "/activo").set(m.activo === false);
+};
+function pintarDetalleQC() {
+    const box = document.getElementById('qc-detalle'); const m = qcMateriales[qcSel]; if (!box || !m) return;
+    const regs = listaRegsQC(); const cv = m.de / m.media * 100;
+    const u = qcUltimo[qcSel]; const hoy = fechaLocalISO(); const eHoy = (u && u.dia === hoy) ? u.estado : "Sin control hoy";
+    box.innerHTML = "<div class=\"qc-cab\"><div><h3 style=\"margin:0;\">" + esc(m.prueba) + " · " + esc(m.nivel) + "</h3><div class=\"qc-datos\"><span>Lote <b>" + esc(m.lote || "-") + "</b></span><span>Vence <b>" + esc(m.vence ? m.vence.split("-").reverse().join("/") : "-") + "</b></span><span>Media <b>" + m.media + "</b> " + esc(m.unidad || "") + "</span><span>DE <b>" + m.de + "</b></span><span>CV <b>" + cv.toFixed(1) + " %</b></span>" + (m.equipo ? "<span>" + esc(m.equipo) + "</span>" : "") + "</div></div>" +
+        "<div><span class=\"qc-est " + claseEstadoQC(eHoy) + "\" style=\"font-size:.85rem;\">" + iconoEstadoQC(eHoy) + " Hoy: " + esc(eHoy) + "</span></div></div>" +
+        (puedeValidar() ? "<div class=\"qc-carga\"><b>Valor de hoy:</b><input type=\"number\" step=\"any\" id=\"qc-valor\" onkeydown=\"if(event.key==='Enter')registrarQC()\" placeholder=\"" + m.media + "\"><span>" + esc(m.unidad || "") + "</span><button class=\"action-btn btn-validate-pdf\" onclick=\"registrarQC()\">Registrar</button><span style=\"flex:1\"></span><button class=\"btn-mini\" onclick=\"recalcularQC()\">Calcular media/DE con mis datos</button><button class=\"btn-mini\" onclick=\"desactivarQC()\">" + (m.activo === false ? "Reactivar" : "Dar de baja (lote terminado)") + "</button></div>" : "") +
+        "<div class=\"qc-clave\"><span><b style=\"color:#0ca30c\">●</b> Aceptado</span><span><b style=\"color:#d97706\">▲</b> Advertencia (1-2s)</span><span><b style=\"color:#d03b3b\">✖</b> Rechazado</span><span><b style=\"color:#94A3B8\">○</b> Excluido</span><span>Líneas: media, ±1, ±2 y ±3 DE</span></div>" +
+        "<div class=\"qc-graf\" id=\"qc-graf\">" + graficoLJ(regs, m) + "<div class=\"qc-tip\" id=\"qc-tip\"></div></div>" +
+        "<h4 style=\"margin:16px 0 6px;\">Registros (últimos " + regs.length + ")</h4><div class=\"hist-tabla-caja\" style=\"max-height:320px;\"><table class=\"results-table hist-tabla\"><thead><tr><th>Fecha</th><th>Valor</th><th>DE (z)</th><th>Estado</th><th>Reglas</th><th>Acción correctiva</th><th>Usuario</th><th></th></tr></thead><tbody>" +
+        regs.slice().reverse().map(r => "<tr style=\"" + (r.excluido ? "opacity:.5;" : "") + "\"><td>" + esc(new Date(r.fecha).toLocaleString([], { dateStyle: "short", timeStyle: "short" })) + "</td><td><b>" + r.valor + "</b></td><td>" + (r.z > 0 ? "+" : "") + Number(r.z).toFixed(2) + "</td><td><span class=\"qc-est " + claseEstadoQC(r.estado) + "\">" + iconoEstadoQC(r.estado) + " " + esc(r.estado) + "</span></td><td>" + esc(r.reglas || "") + "</td><td>" + esc(r.accion || "") + (puedeValidar() ? " <button class=\"btn-mini\" onclick=\"accionCorrectivaQC(" + jsArg(r.key) + ")\">✏️</button>" : "") + "</td><td>" + esc(String(r.por || "").split("@")[0]) + "</td><td>" + (puedeValidar() ? "<button class=\"btn-mini\" title=\"Excluir de las reglas (p. ej. un error de carga)\" onclick=\"excluirQC(" + jsArg(r.key) + ")\">" + (r.excluido ? "Incluir" : "Excluir") + "</button>" : "") + "</td></tr>").join("") +
+        "</tbody></table></div>";
+    activarTooltipLJ(regs, m);
+}
+function graficoLJ(regs, m) {
+    const W = 860, H = 300, L = 54, R = 16, T = 14, B = 34;
+    const n = Math.max(regs.length, 2), x = i => L + (W - L - R) * (regs.length <= 1 ? 0.5 : i / (regs.length - 1));
+    const zMax = Math.max(3.6, ...regs.map(r => Math.min(Math.abs(r.z) + 0.3, 6)));
+    const y = z => T + (H - T - B) * (1 - (z + zMax) / (2 * zMax));
+    let g = "<svg viewBox=\"0 0 " + W + " " + H + "\" role=\"img\" aria-label=\"Gráfica Levey-Jennings de " + esc(m.prueba) + "\">";
+    [[3, "#d03b3b", "4 3"], [2, "#d97706", "6 4"], [1, "#c3c2b7", "2 4"]].forEach(([k, col, dash]) => [k, -k].forEach(zz => {
+        g += "<line x1=\"" + L + "\" x2=\"" + (W - R) + "\" y1=\"" + y(zz) + "\" y2=\"" + y(zz) + "\" stroke=\"" + col + "\" stroke-width=\"1\" stroke-dasharray=\"" + dash + "\"/>";
+        g += "<text x=\"" + (L - 6) + "\" y=\"" + (y(zz) + 4) + "\" text-anchor=\"end\" font-size=\"11\" fill=\"#64748B\">" + (zz > 0 ? "+" : "−") + k + "DE</text>";
+    }));
+    g += "<line x1=\"" + L + "\" x2=\"" + (W - R) + "\" y1=\"" + y(0) + "\" y2=\"" + y(0) + "\" stroke=\"#334155\" stroke-width=\"1.5\"/><text x=\"" + (L - 6) + "\" y=\"" + (y(0) + 4) + "\" text-anchor=\"end\" font-size=\"11\" font-weight=\"bold\" fill=\"#334155\">x̄ " + m.media + "</text>";
+    if (!regs.length) return g + "<text x=\"" + (W / 2) + "\" y=\"" + (H / 2 - 20) + "\" text-anchor=\"middle\" fill=\"#94A3B8\" font-size=\"14\">Sin datos todavía: registre el primer valor arriba</text></svg>";
+    const pts = regs.map((r, i) => [x(i), y(Math.max(-zMax, Math.min(zMax, r.z)))]);
+    g += "<polyline fill=\"none\" stroke=\"#64748B\" stroke-width=\"2\" stroke-linejoin=\"round\" points=\"" + pts.map(p => p.join(",")).join(" ") + "\"/>";
+    regs.forEach((r, i) => {
+        const [cx, cy] = pts[i];
+        if (r.excluido) g += "<circle cx=\"" + cx + "\" cy=\"" + cy + "\" r=\"5\" fill=\"#fff\" stroke=\"#94A3B8\" stroke-width=\"2\"/>";
+        else if (r.estado === "Rechazado") g += "<g stroke=\"#fff\" stroke-width=\"5\"><line x1=\"" + (cx - 6) + "\" y1=\"" + (cy - 6) + "\" x2=\"" + (cx + 6) + "\" y2=\"" + (cy + 6) + "\"/><line x1=\"" + (cx + 6) + "\" y1=\"" + (cy - 6) + "\" x2=\"" + (cx - 6) + "\" y2=\"" + (cy + 6) + "\"/></g><g stroke=\"#d03b3b\" stroke-width=\"3\" stroke-linecap=\"round\"><line x1=\"" + (cx - 6) + "\" y1=\"" + (cy - 6) + "\" x2=\"" + (cx + 6) + "\" y2=\"" + (cy + 6) + "\"/><line x1=\"" + (cx + 6) + "\" y1=\"" + (cy - 6) + "\" x2=\"" + (cx - 6) + "\" y2=\"" + (cy + 6) + "\"/></g>";
+        else if (r.estado === "Advertencia") g += "<polygon points=\"" + cx + "," + (cy - 7) + " " + (cx + 7) + "," + (cy + 6) + " " + (cx - 7) + "," + (cy + 6) + "\" fill=\"#fab219\" stroke=\"#fff\" stroke-width=\"2\"/>";
+        else g += "<circle cx=\"" + cx + "\" cy=\"" + cy + "\" r=\"5\" fill=\"#0ca30c\" stroke=\"#fff\" stroke-width=\"2\"/>";
+    });
+    const paso = Math.ceil(regs.length / 10);
+    regs.forEach((r, i) => { if (i % paso === 0 || i === regs.length - 1) g += "<text x=\"" + pts[i][0] + "\" y=\"" + (H - 12) + "\" text-anchor=\"middle\" font-size=\"10\" fill=\"#64748B\">" + esc(r.dia.slice(8, 10) + "/" + r.dia.slice(5, 7)) + "</text>"; });
+    return g + "</svg>";
+}
+function activarTooltipLJ(regs, m) {
+    const box = document.getElementById('qc-graf'), tip = document.getElementById('qc-tip'); if (!box || !regs.length) return;
+    const svg = box.querySelector('svg');
+    svg.addEventListener('mousemove', e => {
+        const rc = svg.getBoundingClientRect(); const fx = (e.clientX - rc.left) / rc.width * 860;
+        const L = 54, R = 16; const i = regs.length <= 1 ? 0 : Math.round((fx - L) / ((860 - L - R) / (regs.length - 1)));
+        const r = regs[Math.max(0, Math.min(regs.length - 1, i))]; if (!r) return;
+        tip.innerHTML = "<b>" + esc(new Date(r.fecha).toLocaleString([], { dateStyle: "short", timeStyle: "short" })) + "</b><br>" + r.valor + " " + esc(m.unidad || "") + " (" + (r.z > 0 ? "+" : "") + Number(r.z).toFixed(2) + " DE)<br>" + iconoEstadoQC(r.estado) + " " + esc(r.estado) + (r.reglas ? " · " + esc(r.reglas) : "") + (r.excluido ? "<br>(excluido)" : "");
+        tip.style.display = "block"; tip.style.left = Math.min(e.clientX - box.getBoundingClientRect().left + 12, box.clientWidth - 200) + "px"; tip.style.top = (e.clientY - box.getBoundingClientRect().top - 10) + "px";
+    });
+    svg.addEventListener('mouseleave', () => tip.style.display = "none");
+}
+
+
+// =====================================================================
+//  INFORME PROFESIONAL: logo, firmas, comentarios
+// =====================================================================
+let firmasGlobal = {}, imagenesPendientes = {};
+function iniciarFirmas() { db.ref("firmas").on("value", s => { firmasGlobal = s.val() || {}; }); }
+function firmasDe(emails) {
+    const porEmail = {}; Object.values(firmasGlobal).forEach(f => { if (f.email) porEmail[String(f.email).toLowerCase()] = f; });
+    const out = [];
+    (emails || []).join(",").split(",").map(e => e.trim().toLowerCase()).filter(Boolean).forEach(e => {
+        const f = porEmail[e];
+        if (f) out.push({ nombre: f.nombre || e, titulo: f.titulo || "", matricula: f.matricula || "", firma: f.firma || "", sello: f.sello || "" });
+        else out.push({ nombre: e, titulo: "", matricula: "", firma: "", sello: "" });
+    });
+    return out;
+}
+// Achica la imagen en el navegador antes de guardarla (para que no pese)
+function achicarImagen(file, maxW, maxH) {
+    return new Promise((ok, mal) => {
+        const fr = new FileReader();
+        fr.onload = () => {
+            const img = new Image();
+            img.onload = () => {
+                const k = Math.min(1, maxW / img.width, maxH / img.height);
+                const c = document.createElement("canvas"); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+                const x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height); x.drawImage(img, 0, 0, c.width, c.height);
+                let url = c.toDataURL("image/png"); if (url.length > 140000) url = c.toDataURL("image/jpeg", 0.85);
+                ok(url);
+            };
+            img.onerror = () => mal(new Error("No es una imagen válida"));
+            img.src = fr.result;
+        };
+        fr.readAsDataURL(file);
+    });
+}
+const PREV_IMG = { logo: "conf-lab-logo-prev", firma: "mf-firma-prev", sello: "mf-sello-prev" };
+window.cargarImagen = async function (input, tipo) {
+    const f = input.files && input.files[0]; if (!f) return;
+    try {
+        const url = await achicarImagen(f, tipo === "logo" ? 500 : 420, tipo === "logo" ? 200 : 170);
+        imagenesPendientes[tipo] = url;
+        const p = document.getElementById(PREV_IMG[tipo]); p.src = url; p.style.display = "block";
+        if (tipo === "logo") mostrarToast("Logo listo", "Presione 'Guardar Perfil de Laboratorio'.");
+    } catch (e) { alert(e.message); }
+};
+window.quitarImagen = function (tipo) { imagenesPendientes[tipo] = ""; const p = document.getElementById(PREV_IMG[tipo]); p.removeAttribute("src"); p.style.display = "none"; };
+function mostrarPrev(tipo, url) { const p = document.getElementById(PREV_IMG[tipo]); if (!p) return; if (url) { p.src = url; p.style.display = "block"; } else { p.removeAttribute("src"); p.style.display = "none"; } }
+window.abrirMiFirma = function () {
+    const uid = auth.currentUser.uid, f = firmasGlobal[uid] || {};
+    document.getElementById('mf-nombre').value = f.nombre || (miPerfil && miPerfil.nombre) || "";
+    document.getElementById('mf-titulo').value = f.titulo || ""; document.getElementById('mf-matricula').value = f.matricula || "";
+    delete imagenesPendientes.firma; delete imagenesPendientes.sello;
+    mostrarPrev("firma", f.firma); mostrarPrev("sello", f.sello);
+    document.getElementById('modal-firma').style.display = "flex";
+};
+window.guardarMiFirma = async function () {
+    const uid = auth.currentUser.uid, f = firmasGlobal[uid] || {};
+    const datos = {
+        email: auth.currentUser.email, nombre: document.getElementById('mf-nombre').value.trim(), titulo: document.getElementById('mf-titulo').value.trim(), matricula: document.getElementById('mf-matricula').value.trim(),
+        firma: imagenesPendientes.firma !== undefined ? (imagenesPendientes.firma || null) : (f.firma || null),
+        sello: imagenesPendientes.sello !== undefined ? (imagenesPendientes.sello || null) : (f.sello || null), actualizado: new Date().toISOString()
+    };
+    if (!datos.nombre) return alert("Escriba su nombre como debe salir en el informe");
+    try { await db.ref("firmas/" + uid).set(datos); } catch (e) { return alert("No se pudo guardar: " + e.message + "\n¿Publicó las reglas nuevas de Firebase?"); }
+    document.getElementById('modal-firma').style.display = "none"; mostrarToast("✍️ Firma guardada", "Saldrá en los informes que usted valide.");
+};
+window.comentarPrueba = async function (n) {
+    const key = pacienteSeleccionadoId, r = datosGlobales[key]; if (!r) return;
+    const actual = (r.comentarios || {})[String(n).toUpperCase()] || "";
+    const t = prompt("Comentario para " + n + " (sale debajo del resultado en el informe). Déjelo vacío para borrarlo:", actual);
+    if (t === null) return;
+    await db.ref("resultados/" + key + "/comentarios/" + String(n).toUpperCase()).set(t.trim() || null);
+    registrarAuditoria(key, "Comentario en " + n, t.trim());
+};
+window.guardarObservacion = async function () {
+    const key = pacienteSeleccionadoId; if (!key || !puedeValidar()) return;
+    const t = document.getElementById('obs-general').value.trim();
+    await db.ref("resultados/" + key + "/observacion").set(t || null);
+    mostrarToast("Observación guardada", t ? "Saldrá en el informe." : "Se quitó la observación.");
+};

@@ -116,6 +116,7 @@ function mostrarLista() {
 
 function informeDe(i) {
     const o = ordenes[i].o, d = Object.assign({}, o.d);
+    d.lab = Object.assign({}, d.lab || {}, { logo: labPublico.logo || "", pie: (d.lab && d.lab.pie) || labPublico.pie || "" });
     d.pendientes = (o.examenes || []).filter(e => e.estado !== "listo").map(e => e.codigo);
     return d;
 }
