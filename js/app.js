@@ -58,9 +58,9 @@ let listenersActivos = false;
 //  ROLES Y USUARIOS
 // =====================================================================
 const ROLES = {
-    admin: { nombre: "Administrador", vistas: ["admision", "validacion", "historial", "estadisticas", "inventario", "configuracion"] },
+    admin: { nombre: "Administrador", vistas: ["admision", "validacion", "historial", "caja", "estadisticas", "inventario", "monitoreo", "configuracion"] },
     bioquimico: { nombre: "Bioquímico (valida)", vistas: ["admision", "validacion", "historial", "estadisticas", "inventario"] },
-    recepcion: { nombre: "Recepción", vistas: ["admision", "validacion", "historial"] },
+    recepcion: { nombre: "Recepción", vistas: ["admision", "validacion", "historial", "caja"] },
     consulta: { nombre: "Solo consulta", vistas: ["validacion", "historial", "estadisticas"] }
 };
 let miRol = null, miPerfil = null;
@@ -148,7 +148,7 @@ window.olvideClaveLogin = async function () {
     catch (e) { err.style.color = "red"; err.innerText = "No se pudo enviar [" + e.code + "]"; }
     err.style.display = 'block';
 };
-function cerrarSesion() { detenerPanelUsuarios(); auth.signOut(); }
+function cerrarSesion() { detenerPanelUsuarios(); detenerMonitoreo(); if (cajaRef) cajaRef.off(); auth.signOut(); }
 setInterval(() => { document.getElementById('reloj').innerText = new Date().toLocaleString(); }, 1000);
 
 function switchView(viewId, element) {
@@ -159,6 +159,8 @@ function switchView(viewId, element) {
     if (element) element.classList.add('active');
 
     if (viewId === 'historial' && !document.getElementById('hist-desde').value) semanaHistorial();
+    if (viewId === 'caja') cargarCaja();
+    if (viewId === 'monitoreo') { iniciarMonitoreo(); pintarMonitoreo(); }
     if (viewId === 'estadisticas') {
         const hoy = new Date();
         document.getElementById('filtro-fecha-inicio').value = fechaLocalISO(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
@@ -482,7 +484,17 @@ function actualizarCotizacion() {
     document.getElementById('lista-precios').innerHTML = h;
     const t = calcularTotales();
     document.getElementById('lbl-subtotal').innerText = t.subtotal.toFixed(2) + " Bs"; document.getElementById('lbl-descuento').innerText = "- " + t.descuento.toFixed(2) + " Bs"; document.getElementById('lbl-total').innerText = t.total.toFixed(2) + " Bs";
+    const pm = document.getElementById('pago-monto');
+    if (pm && !pm.dataset.tocado) pm.value = t.total.toFixed(2);   // por defecto paga todo
+    actualizarSaldoAdmision();
 }
+window.actualizarSaldoAdmision = function () {
+    const pm = document.getElementById('pago-monto'); if (!pm) return;
+    if (document.activeElement === pm) pm.dataset.tocado = "1";
+    const total = calcularTotales().total, pago = Math.max(0, num(pm.value) || 0);
+    const saldo = Math.max(0, total - pago);
+    const el = document.getElementById('pago-saldo'); el.innerText = saldo.toFixed(2) + " Bs"; el.className = "pago-saldo" + (saldo > 0 ? " debe" : "");
+};
 
 function buscarPaciente() {
     const ci = document.getElementById('ci').value.trim(); if (!ci) return alert("Ingrese un CI.");
@@ -600,7 +612,15 @@ async function generarOrden() {
             subtotal: t.subtotal, descuento: t.descuento, total: t.total, total_cobrado: t.total.toFixed(2) + " Bs",
             estado: "Pendiente", fecha_creacion: new Date().toISOString(), creado_por: usuarioActual()
         };
+        // ---- Caja: pago inicial ----
+        const pagoIni = Math.min(t.total, Math.max(0, num(document.getElementById('pago-monto').value) || 0));
+        const metodoIni = document.getElementById('pago-metodo').value;
+        ordenNueva.pagado = +pagoIni.toFixed(2); ordenNueva.saldo = +(t.total - pagoIni).toFixed(2);
+        ordenNueva.estado_pago = ordenNueva.saldo <= 0 ? "Pagado" : (pagoIni > 0 ? "Parcial" : "Debe");
+        if (pagoIni > 0) { ordenNueva.pagos = {}; ordenNueva.pagos["p" + Date.now()] = { monto: ordenNueva.pagado, metodo: metodoIni, fecha: ordenNueva.fecha_creacion, por: usuarioActual() }; }
         await db.ref("ordenes_pendientes/" + idMuestra).set(ordenNueva);
+        if (pagoIni > 0) await registrarMovimientoCaja({ tipo: "pago", monto: ordenNueva.pagado, metodo: metodoIni, muestra: idMuestra, paciente: nombre, ci: ci, detalle: "Pago al crear la orden" });
+        const pmr = document.getElementById('pago-monto'); delete pmr.dataset.tocado;
         ultimaOrden = Object.assign({ pin: acceso.pin, token: acceso.token, seguro_texto: seguroTexto }, ordenNueva);
         publicarOrdenEnPortal(idMuestra, ordenNueva).catch(e => console.warn("Portal:", e));
 
@@ -691,7 +711,8 @@ function imprimirComprobante() {
         (o.medico ? "<br><b>Médico:</b> " + esc(o.medico) : "") + "<br><b>N° de orden:</b> " + esc(o.id_muestra) + "</p>" +
         "<div class=\"bc\">" + svg + "</div>" +
         "<p><b>Exámenes (" + o.examenes.length + "):</b><br>" + esc(o.examenes.join(", ")) + "</p>" +
-        "<p><b>Total:</b> " + esc(o.total_cobrado) + (o.seguro_texto ? "<br><small>" + esc(o.seguro_texto) + "</small>" : "") + "</p><hr>" +
+        "<p><b>Total:</b> " + esc(o.total_cobrado) + (o.seguro_texto ? "<br><small>" + esc(o.seguro_texto) + "</small>" : "") +
+        (o.pagado !== undefined ? "<br><b>Pagado:</b> " + Number(o.pagado).toFixed(2) + " Bs" + (o.saldo > 0 ? "<br><b>SALDO PENDIENTE:</b> " + Number(o.saldo).toFixed(2) + " Bs" : " ✔") : "") + "</p><hr>" +
         "<div class=\"tit\">VEA SUS RESULTADOS EN LÍNEA</div>" +
         (qr ? "<img class=\"qr\" src=\"" + qr + "\">" : "") +
         "<p class=\"ctr\">Escanee el código con su celular<br>o entre a:<br><small>" + esc(urlPortal()) + "</small></p>" +
@@ -1813,3 +1834,194 @@ window.reclamarPropietario = async function () {
     try { await db.ref("propietario_uid").set(auth.currentUser.uid); mostrarToast("👑 Propietario", "Su cuenta quedó protegida."); }
     catch (e) { alert("No se pudo: " + e.message + "\n\n¿Ya publicó las reglas nuevas de Firebase?"); }
 };
+
+// =====================================================================
+//  CAJA
+// =====================================================================
+const METODOS_PAGO = ["Efectivo", "QR", "Tarjeta", "Transferencia", "Seguro / Crédito"];
+let cajaRef = null, cierresRef = null, cajaMovs = {}, cajaOrdenesDia = {}, cajaDeudas = [], cajaCierres = {};
+function registrarMovimientoCaja(m) {
+    const ahora = new Date();
+    return db.ref("caja_movimientos").push(Object.assign({ fecha: ahora.toISOString(), dia: fechaLocalISO(ahora), por: usuarioActual() }, m));
+}
+function bs(n) { return (Number(n) || 0).toFixed(2) + " Bs"; }
+window.cargarCaja = async function () {
+    const inp = document.getElementById('caja-dia'); if (!inp.value) inp.value = fechaLocalISO();
+    const dia = inp.value;
+    if (cajaRef) cajaRef.off();
+    cajaRef = db.ref("caja_movimientos").orderByChild("dia").equalTo(dia);
+    cajaRef.on("value", s => { cajaMovs = s.val() || {}; pintarCaja(); });
+    if (cierresRef) cierresRef.off();
+    cierresRef = db.ref("caja_cierres/" + dia); cierresRef.on("value", s => { cajaCierres = s.val() || {}; pintarCierres(); });
+    // Órdenes creadas ese día (para lo facturado)
+    const sig = fechaLocalISO(new Date(new Date(dia + "T12:00:00").getTime() + 864e5));
+    const desde = new Date(dia + "T00:00:00").toISOString(), hasta = new Date(sig + "T00:00:00").toISOString();
+    cajaOrdenesDia = (await db.ref("ordenes_pendientes").orderByChild("fecha_creacion").startAt(desde).endAt(hasta).once("value")).val() || {};
+    cargarDeudas(); pintarCaja();
+};
+async function cargarDeudas() {
+    const desde = new Date(Date.now() - 60 * 864e5).toISOString();
+    const ords = (await db.ref("ordenes_pendientes").orderByChild("fecha_creacion").startAt(desde).once("value")).val() || {};
+    cajaDeudas = Object.values(ords).filter(o => Number(o.saldo) > 0.004).sort((a, b) => String(b.fecha_creacion).localeCompare(String(a.fecha_creacion)));
+    pintarDeudas();
+}
+function resumenCaja() {
+    const r = { neto: 0, metodos: {}, n: 0 };
+    METODOS_PAGO.forEach(m => r.metodos[m] = 0);
+    Object.values(cajaMovs).forEach(m => { const v = Number(m.monto) || 0; r.neto += v; r.metodos[m.metodo] = (r.metodos[m.metodo] || 0) + v; r.n++; });
+    return r;
+}
+function pintarCaja() {
+    const r = resumenCaja();
+    const ords = Object.values(cajaOrdenesDia);
+    const facturado = ords.reduce((a, o) => a + (Number(o.total) || 0), 0);
+    const saldoDia = ords.reduce((a, o) => a + (Number(o.saldo) || 0), 0);
+    const t = (titulo, valor, clase) => "<div class=\"caja-tarjeta " + (clase || "") + "\"><div class=\"t\">" + titulo + "</div><div class=\"v\">" + valor + "</div></div>";
+    document.getElementById('caja-tarjetas').innerHTML =
+        t("Cobrado (neto)", bs(r.neto), "verde") +
+        METODOS_PAGO.map(m => t(m, bs(r.metodos[m]))).join("") +
+        t("Órdenes del día", ords.length, "azul") + t("Facturado del día", bs(facturado), "azul") + t("Quedó por cobrar hoy", bs(saldoDia), saldoDia > 0 ? "rojo" : "");
+    const filas = Object.keys(cajaMovs).sort((a, b) => String(cajaMovs[b].fecha).localeCompare(String(cajaMovs[a].fecha))).map(k => {
+        const m = cajaMovs[k]; const anulado = !!m.anulado_por; const neg = Number(m.monto) < 0;
+        const btn = (esAdmin() && !anulado && !neg) ? "<button class=\"btn-mini\" onclick=\"anularMovimiento(" + jsArg(k) + ")\">Anular</button>" : "";
+        return "<tr class=\"" + (anulado ? "mov-anulado" : (neg ? "mov-neg" : "")) + "\" title=\"" + esc(m.detalle || "") + "\"><td>" + esc(new Date(m.fecha).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })) + "</td><td>" + esc(m.muestra || "") + "</td><td>" + esc(m.paciente || "") + "</td><td>" + esc(m.metodo || "") + "</td><td style=\"text-align:right; font-weight:bold;\">" + bs(m.monto) + "</td><td>" + esc(String(m.por || "").split("@")[0]) + "</td><td>" + btn + "</td></tr>";
+    }).join("");
+    document.getElementById('caja-movs').innerHTML = filas || "<tr><td colspan=\"7\" style=\"text-align:center; color:#888; padding:15px;\">Sin movimientos este día.</td></tr>";
+    previewCierre();
+}
+function pintarDeudas() {
+    const t = document.getElementById('caja-deudas'); if (!t) return;
+    t.innerHTML = cajaDeudas.map(o => "<tr><td>" + esc(new Date(o.fecha_creacion).toLocaleDateString()) + "</td><td><b>" + esc(o.id_muestra) + "</b></td><td>" + esc(o.nombre_paciente) + "</td><td>" + esc(o.ci_paciente) + "</td><td style=\"text-align:right\">" + bs(o.total) + "</td><td style=\"text-align:right\">" + bs(o.pagado) + "</td><td style=\"text-align:right; color:#B91C1C; font-weight:bold;\">" + bs(o.saldo) + "</td>" +
+        "<td><div class=\"cobro-inline\"><input type=\"number\" step=\"0.5\" id=\"cob-" + esc(o.id_muestra) + "\" value=\"" + Number(o.saldo).toFixed(2) + "\"><select id=\"cobm-" + esc(o.id_muestra) + "\">" + METODOS_PAGO.map(m => "<option>" + m + "</option>").join("") + "</select><button onclick=\"cobrarSaldo(" + jsArg(o.id_muestra) + ")\">Cobrar</button></div></td></tr>").join("")
+        || "<tr><td colspan=\"8\" style=\"text-align:center; color:#888; padding:15px;\">✔ Nadie debe.</td></tr>";
+}
+window.cobrarSaldo = async function (muestra) {
+    const monto = num(document.getElementById('cob-' + muestra).value), metodo = document.getElementById('cobm-' + muestra).value;
+    if (!(monto > 0)) return alert("Escriba un monto mayor a 0");
+    try {
+        const ref = db.ref("ordenes_pendientes/" + muestra);
+        const res = await ref.transaction(o => {
+            if (!o) return o;
+            const saldo = Number(o.saldo) || 0; if (monto > saldo + 0.004) return; // aborta
+            o.pagado = +((Number(o.pagado) || 0) + monto).toFixed(2); o.saldo = +(saldo - monto).toFixed(2);
+            o.estado_pago = o.saldo <= 0 ? "Pagado" : "Parcial";
+            o.pagos = o.pagos || {}; o.pagos["p" + Date.now()] = { monto: monto, metodo: metodo, fecha: new Date().toISOString(), por: usuarioActual() };
+            return o;
+        });
+        if (!res.committed) return alert("El monto es mayor al saldo pendiente.");
+        const o = res.snapshot.val();
+        await registrarMovimientoCaja({ tipo: "pago", monto: monto, metodo: metodo, muestra: muestra, paciente: o.nombre_paciente, ci: o.ci_paciente, detalle: "Cobro de saldo" });
+        mostrarToast("Cobrado", bs(monto) + " · " + o.nombre_paciente + (o.saldo > 0 ? " · saldo " + bs(o.saldo) : " · ✔ pagado"));
+        cargarDeudas(); cargarCaja();
+    } catch (e) { alert("No se pudo cobrar: " + e.message); }
+};
+window.anularMovimiento = async function (k) {
+    if (!esAdmin()) return mostrarToast("Sin permiso", "Solo el Administrador puede anular.");
+    const m = cajaMovs[k]; const motivo = prompt("Motivo de la anulación de " + bs(m.monto) + " (" + (m.paciente || "") + "):");
+    if (!motivo) return;
+    await db.ref("caja_movimientos/" + k).update({ anulado_por: usuarioActual(), anulado_motivo: motivo });
+    await registrarMovimientoCaja({ tipo: "anulacion", monto: -Number(m.monto), metodo: m.metodo, muestra: m.muestra || "", paciente: m.paciente || "", ci: m.ci || "", detalle: "Anulación: " + motivo, anula: k });
+    if (m.muestra) await db.ref("ordenes_pendientes/" + m.muestra).transaction(o => {
+        if (!o) return o; o.pagado = +((Number(o.pagado) || 0) - Number(m.monto)).toFixed(2); o.saldo = +((Number(o.saldo) || 0) + Number(m.monto)).toFixed(2);
+        o.estado_pago = o.saldo <= 0 ? "Pagado" : (o.pagado > 0 ? "Parcial" : "Debe"); return o;
+    });
+    cargarDeudas();
+};
+window.previewCierre = function () {
+    const el = document.getElementById('cierre-diferencia'); if (!el) return;
+    const v = document.getElementById('cierre-efectivo').value;
+    const sis = resumenCaja().metodos["Efectivo"] || 0;
+    if (v === "") { el.innerHTML = "Efectivo según el sistema: <b>" + bs(sis) + "</b>"; el.style.color = "#334155"; return; }
+    const d = (num(v) || 0) - sis;
+    el.innerHTML = "Sistema: " + bs(sis) + " · Contado: " + bs(num(v)) + "<br>Diferencia: <b>" + (d >= 0 ? "+" : "") + d.toFixed(2) + " Bs</b> " + (Math.abs(d) < 0.01 ? "✔ cuadra" : (d > 0 ? "(sobra)" : "(falta)"));
+    el.style.color = Math.abs(d) < 0.01 ? "#166534" : "#B91C1C";
+};
+window.cerrarCaja = async function () {
+    const dia = document.getElementById('caja-dia').value, v = document.getElementById('cierre-efectivo').value;
+    if (v === "") return alert("Escriba el efectivo contado");
+    const r = resumenCaja(); const contado = num(v) || 0;
+    await db.ref("caja_cierres/" + dia).push({ fecha: new Date().toISOString(), usuario: usuarioActual(), neto_sistema: +r.neto.toFixed(2), por_metodo: r.metodos, efectivo_sistema: +(r.metodos["Efectivo"] || 0).toFixed(2), efectivo_contado: contado, diferencia: +(contado - (r.metodos["Efectivo"] || 0)).toFixed(2), observacion: document.getElementById('cierre-obs').value.trim(), movimientos: r.n });
+    document.getElementById('cierre-efectivo').value = ""; document.getElementById('cierre-obs').value = ""; previewCierre();
+    mostrarToast("Caja cerrada", "Cierre del " + dia + " registrado.");
+};
+function pintarCierres() {
+    const el = document.getElementById('cierre-lista'); if (!el) return;
+    const ks = Object.keys(cajaCierres);
+    el.innerHTML = ks.length ? "<b>Cierres registrados este día:</b>" + ks.map(k => { const c = cajaCierres[k]; return "<div style=\"border-top:1px dashed #E2E8F0; padding:4px 0;\">" + esc(new Date(c.fecha).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })) + " · " + esc(String(c.usuario).split("@")[0]) + " · contado " + bs(c.efectivo_contado) + " · dif. <b style=\"color:" + (Math.abs(c.diferencia) < 0.01 ? "#166534" : "#B91C1C") + "\">" + c.diferencia.toFixed(2) + "</b>" + (c.observacion ? "<br><small>" + esc(c.observacion) + "</small>" : "") + "</div>"; }).join("") : "";
+}
+window.exportarCajaExcel = async function () {
+    try { if (!window.ExcelJS) await cargarScript("https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"); } catch (e) { return alert("No se pudo preparar el Excel."); }
+    const dia = document.getElementById('caja-dia').value, r = resumenCaja();
+    const wb = new ExcelJS.Workbook(), ws = wb.addWorksheet("Caja " + dia);
+    const AZUL = "FF0B4F8A", borde = { top: { style: "thin", color: { argb: "FFCBD5E1" } }, left: { style: "thin", color: { argb: "FFCBD5E1" } }, bottom: { style: "thin", color: { argb: "FFCBD5E1" } }, right: { style: "thin", color: { argb: "FFCBD5E1" } } };
+    ws.columns = [{ width: 10 }, { width: 14 }, { width: 30 }, { width: 13 }, { width: 18 }, { width: 13 }, { width: 18 }, { width: 30 }];
+    ws.mergeCells("A1:H1"); ws.getCell("A1").value = (configLab.nombre || "Laboratorio").toUpperCase(); ws.getCell("A1").font = { size: 15, bold: true, color: { argb: "FFFFFFFF" } }; ws.getCell("A1").fill = { type: "pattern", pattern: "solid", fgColor: { argb: AZUL } }; ws.getCell("A1").alignment = { horizontal: "center" }; ws.getRow(1).height = 26;
+    ws.mergeCells("A2:H2"); ws.getCell("A2").value = "REPORTE DE CAJA — " + dia.split("-").reverse().join("/"); ws.getCell("A2").font = { size: 12, bold: true, color: { argb: AZUL } }; ws.getCell("A2").alignment = { horizontal: "center" };
+    ws.mergeCells("A3:H3"); ws.getCell("A3").value = "Generado " + new Date().toLocaleString() + " por " + usuarioActual(); ws.getCell("A3").font = { size: 9, color: { argb: "FF94A3B8" } }; ws.getCell("A3").alignment = { horizontal: "center" };
+    let f = 5;
+    [["Cobrado (neto)", r.neto]].concat(METODOS_PAGO.map(m => [m, r.metodos[m]])).forEach(([k, v]) => { const row = ws.getRow(f++); row.getCell(2).value = k; row.getCell(3).value = +v.toFixed(2); row.getCell(3).numFmt = '#,##0.00 "Bs"'; [2, 3].forEach(c => row.getCell(c).border = borde); row.getCell(2).font = { bold: true }; });
+    f++;
+    const h = ws.getRow(f); h.values = ["Hora", "Tubo", "Paciente", "CI", "Forma de pago", "Monto", "Usuario", "Detalle"];
+    h.eachCell(c => { c.font = { bold: true, color: { argb: "FFFFFFFF" } }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: AZUL } }; c.border = borde; c.alignment = { horizontal: "center" }; });
+    Object.values(cajaMovs).sort((a, b) => String(a.fecha).localeCompare(String(b.fecha))).forEach((m, i) => {
+        const row = ws.addRow([new Date(m.fecha).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), m.muestra || "", m.paciente || "", m.ci || "", m.metodo || "", Number(m.monto) || 0, String(m.por || "").split("@")[0], (m.detalle || "") + (m.anulado_por ? " [ANULADO: " + m.anulado_motivo + "]" : "")]);
+        row.getCell(6).numFmt = '#,##0.00 "Bs"';
+        row.eachCell({ includeEmpty: true }, c => { c.border = borde; if (i % 2) c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } }; });
+        if (Number(m.monto) < 0) row.font = { color: { argb: "FFB91C1C" } };
+    });
+    const buf = await wb.xlsx.writeBuffer();
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([buf])); a.download = "Caja_" + dia + ".xlsx"; document.body.appendChild(a); a.click(); a.remove();
+};
+
+// =====================================================================
+//  MONITOREO (solo Administrador)
+// =====================================================================
+let monActivo = false, monMotores = {}, monCorreosErr = {}, monCorreosPend = 0, monTimer = null;
+function iniciarMonitoreo() {
+    if (monActivo) return; monActivo = true;
+    db.ref("estado_motor/pcs").on("value", s => { monMotores = s.val() || {}; pintarMonitoreo(); });
+    db.ref("cola_correos").orderByChild("estado").equalTo("error").on("value", s => { monCorreosErr = s.val() || {}; pintarMonitoreo(); });
+    db.ref("cola_correos").orderByChild("estado").equalTo("pendiente").on("value", s => { monCorreosPend = s.numChildren ? s.numChildren() : Object.keys(s.val() || {}).length; pintarMonitoreo(); });
+    monTimer = setInterval(pintarMonitoreo, 30000);
+}
+function detenerMonitoreo() {
+    if (!monActivo) return; monActivo = false; clearInterval(monTimer);
+    db.ref("estado_motor/pcs").off(); db.ref("cola_correos").off();
+}
+function haceCuanto(iso) {
+    if (!iso) return "nunca"; const s = (Date.now() - new Date(iso).getTime()) / 1000;
+    if (s < 90) return "hace " + Math.max(1, Math.round(s)) + " s"; if (s < 5400) return "hace " + Math.round(s / 60) + " min";
+    if (s < 172800) return "hace " + Math.round(s / 3600) + " h"; return "hace " + Math.round(s / 86400) + " días";
+}
+function pintarMonitoreo() {
+    if (!document.getElementById('mon-tarjetas')) return;
+    const hoy = fechaLocalISO();
+    const res = Object.values(datosGlobales);
+    const resHoy = res.filter(r => { const f = fechaDeResultado(r); return f && fechaLocalISO(f) === hoy; }).length;
+    const ultimo = res.map(r => r.fecha_recepcion).filter(Boolean).sort().pop();
+    const pend = res.filter(r => r.estado === "Completado").length;
+    const ords = Object.values(ordenesGlobales).filter(o => o.fecha_creacion && fechaLocalISO(new Date(o.fecha_creacion)) === hoy).length;
+    const pcs = Object.keys(monMotores), online = pcs.filter(k => (Date.now() - new Date(monMotores[k].ultimo).getTime()) < 180000).length;
+    const nErr = Object.keys(monCorreosErr).length;
+    const t = (titulo, valor, clase, sub) => "<div class=\"caja-tarjeta " + (clase || "") + "\"><div class=\"t\">" + titulo + "</div><div class=\"v\">" + valor + "</div>" + (sub ? "<small>" + sub + "</small>" : "") + "</div>";
+    document.getElementById('mon-tarjetas').innerHTML =
+        t("Motores en línea", online + " / " + pcs.length, pcs.length && online === pcs.length ? "verde" : "rojo") +
+        t("Órdenes hoy", ords, "azul") + t("Resultados hoy", resHoy, "azul", "último: " + haceCuanto(ultimo)) +
+        t("Por validar", pend, pend ? "" : "verde") +
+        t("Correos en cola", monCorreosPend, monCorreosPend > 5 ? "rojo" : "") + t("Correos con error", nErr, nErr ? "rojo" : "verde");
+    document.getElementById('mon-motores').innerHTML = pcs.length ? pcs.map(k => {
+        const m = monMotores[k], on = (Date.now() - new Date(m.ultimo).getTime()) < 180000;
+        const eq = m.equipos || {};
+        return "<div class=\"motor-card " + (on ? "on" : "off") + "\"><div style=\"display:flex; justify-content:space-between;\"><b>🖥️ " + esc(m.pc || k) + "</b><span>" + (on ? "<span class=\"status-pill val\">En línea</span>" : "<span class=\"status-pill rech\">SIN SEÑAL " + haceCuanto(m.ultimo) + "</span>") + "</span></div>" +
+            "<div class=\"fila\"><span>Versión del motor</span><b>" + esc(m.version || "") + "</b></div>" +
+            "<div class=\"fila\"><span>Firebase</span><b>" + esc(m.general || "") + "</b></div>" +
+            Object.keys(eq).map(n => "<div class=\"fila\"><span>🔬 " + esc(n) + "</span><b>" + esc(eq[n]) + "</b></div>").join("") +
+            "<div class=\"fila\"><span>Resultados esperando internet</span><b>" + (m.cola_offline || 0) + "</b></div>" +
+            "<div class=\"fila\"><span>Correo</span><b>" + esc(m.correo || "") + "</b></div>" +
+            "<div class=\"fila\"><span>Copia de seguridad</span><b>" + esc(m.respaldo || "") + "</b></div>" +
+            "<div class=\"fila\" style=\"border:none\"><span>Última señal</span><b>" + esc(new Date(m.ultimo).toLocaleString()) + "</b></div></div>";
+    }).join("") : "<p style=\"color:#888\">Ningún motor ha enviado señal todavía. Actualice el motor a la versión 3.2.</p>";
+    const ks = Object.keys(monCorreosErr);
+    document.getElementById('mon-correos').innerHTML = ks.length ? "<table class=\"results-table\"><thead><tr><th>Fecha</th><th>Para</th><th>Asunto</th><th>Error</th><th></th></tr></thead><tbody>" + ks.map(k => { const c = monCorreosErr[k]; return "<tr><td>" + esc(new Date(c.creado).toLocaleString()) + "</td><td>" + esc(c.para) + "</td><td>" + esc(c.asunto || "") + "</td><td style=\"color:#B91C1C\">" + esc(c.error || "") + "</td><td><button class=\"btn-mini\" onclick=\"reintentarCorreo(" + jsArg(k) + ")\">Reintentar</button> <button class=\"btn-mini\" onclick=\"db.ref('cola_correos/' + " + jsArg(k) + ").remove()\">Descartar</button></td></tr>"; }).join("") + "</tbody></table>" : "<p style=\"color:#166534\">✔ Sin errores.</p>";
+}
+window.reintentarCorreo = function (k) { db.ref("cola_correos/" + k).update({ estado: "pendiente", intentos: 0, error: null }); mostrarToast("Reintentando", "El motor lo enviará en unos segundos."); };
