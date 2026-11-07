@@ -32,14 +32,41 @@ window.AES_LABORATORIOS = {
 
 (function () {
     const labs = window.AES_LABORATORIOS, codigos = Object.keys(labs);
+    const maestro = labs[codigos[0]];
     const esPortal = /portal\.html$/i.test(location.pathname);
-    const pedido = (new URLSearchParams(location.search).get("lab") || "").toLowerCase();
+    const pedido = (new URLSearchParams(location.search).get("lab") || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    // Laboratorios agregados desde la plataforma (Configuración → Laboratorios clientes).
+    // Se guardan en el Firebase principal (registro_labs) y aquí se leen sin tocar este archivo.
+    function delRegistro(cod) {
+        try {
+            const x = new XMLHttpRequest();
+            x.open("GET", maestro.firebase.databaseURL + "/registro_labs/" + cod + ".json", false);   // síncrono: se necesita antes de arrancar
+            x.send();
+            if (x.status === 200) { const v = JSON.parse(x.responseText); if (v && v.firebase) return v; }
+        } catch (e) { }
+        try { const c = JSON.parse(localStorage.getItem("aes_lab_cache_" + cod) || "null"); if (c) return c; } catch (e) { }
+        return null;
+    }
     let codigo = labs[pedido] ? pedido : null;
+    if (!codigo && pedido) { const r = delRegistro(pedido); if (r) { labs[pedido] = r; codigo = pedido; try { localStorage.setItem("aes_lab_cache_" + pedido, JSON.stringify(r)); } catch (e) { } } }
     // En el LIS se recuerda el laboratorio de esta PC; en el portal manda solo el enlace
-    if (!codigo && !esPortal) { try { const g = localStorage.getItem("aes_lab"); if (labs[g]) codigo = g; } catch (e) { } }
+    if (!codigo && !esPortal) {
+        try {
+            const g = localStorage.getItem("aes_lab");
+            if (labs[g]) codigo = g;
+            else if (g) { const r = delRegistro(g); if (r) { labs[g] = r; codigo = g; } }
+        } catch (e) { }
+    }
     if (!codigo) codigo = codigos[0];
-    if (!esPortal && labs[pedido]) { try { localStorage.setItem("aes_lab", pedido); } catch (e) { } }
+    if (!esPortal && codigo === pedido) { try { localStorage.setItem("aes_lab", pedido); } catch (e) { } }
     window.AES_LAB_CODIGO = codigo;
     window.AES_LAB = labs[codigo];
     window.AES_LAB_ES_PRIMERO = codigo === codigos[0];
+    window.AES_LAB_MAESTRO = maestro;
+    // Laboratorio suspendido desde la plataforma (p. ej. por falta de pago)
+    if (window.AES_LAB.activo === false && !esPortal) {
+        document.addEventListener("DOMContentLoaded", () => {
+            document.body.innerHTML = "<div style=\"font-family:Arial;max-width:520px;margin:80px auto;text-align:center;\"><h2>⏸ Servicio suspendido</h2><p>El sistema de <b>" + (window.AES_LAB.nombre || "este laboratorio") + "</b> está temporalmente suspendido.</p><p>Comuníquese con su proveedor del sistema.</p></div>";
+        });
+    }
 })();

@@ -7,7 +7,7 @@
 //  las REGLAS de la base de datos: ver archivo firebase_reglas.json)
 // Los datos de Firebase de cada laboratorio están en js/laboratorios.js
 const firebaseConfig = window.AES_LAB.firebase;
-const VERSION_WEB = "6.1";   // súbalo junto con ?v= en index.html
+const VERSION_WEB = "6.2";   // súbalo junto con ?v= en index.html
 firebase.initializeApp(firebaseConfig);
 try { document.getElementById('login-lab').innerText = window.AES_LAB.nombre || ''; document.getElementById('version-web').innerText = 'v' + VERSION_WEB; } catch (e) { }
 const db = firebase.database();
@@ -59,9 +59,9 @@ let listenersActivos = false;
 //  ROLES Y USUARIOS
 // =====================================================================
 const ROLES = {
-    admin: { nombre: "Administrador", vistas: ["admision", "validacion", "historial", "control", "caja", "estadisticas", "inventario", "monitoreo", "configuracion"] },
+    admin: { nombre: "Administrador", vistas: ["admision", "validacion", "historial", "control", "caja", "facturacion", "estadisticas", "inventario", "monitoreo", "configuracion"] },
     bioquimico: { nombre: "Bioquímico (valida)", vistas: ["admision", "validacion", "historial", "control", "estadisticas", "inventario"] },
-    recepcion: { nombre: "Recepción", vistas: ["admision", "validacion", "historial", "caja"] },
+    recepcion: { nombre: "Recepción", vistas: ["admision", "validacion", "historial", "caja", "facturacion"] },
     consulta: { nombre: "Solo consulta", vistas: ["validacion", "historial", "control", "estadisticas"] }
 };
 let miRol = null, miPerfil = null;
@@ -120,6 +120,12 @@ function aplicarRol() {
     // Abre la primera vista permitida
     const activa = document.querySelector('.view-section.active'); const actual = activa ? activa.id.replace("view-", "") : "";
     if (!permitidas.includes(actual)) { const i = [...document.querySelectorAll('.nav-item')].find(el => el.style.display !== "none"); if (i) i.click(); }
+    document.body.classList.toggle("lab-maestro", !!window.AES_LAB_ES_PRIMERO);
+    db.ref("propietario_uid").once("value").then(x => {
+        const soy = x.val() === auth.currentUser.uid; document.body.classList.toggle("es-propietario", soy);
+        if (soy && window.AES_LAB_ES_PRIMERO) iniciarPanelLabs();
+    }).catch(() => { });
+    if (esAdmin()) { iniciarPanelInstalador(); }
     if (esAdmin()) { iniciarPanelUsuarios(); document.getElementById('nu-rol').innerHTML = opcionesRol('recepcion'); }
 }
 
@@ -163,6 +169,7 @@ function switchView(viewId, element) {
 
     if (viewId === 'historial' && !document.getElementById('hist-desde').value) semanaHistorial();
     if (viewId === 'caja') cargarCaja();
+    if (viewId === 'facturacion') { if (!document.getElementById('fac-desde').value) { const h = new Date(); document.getElementById('fac-hasta').value = fechaLocalISO(h); document.getElementById('fac-desde').value = fechaLocalISO(new Date(h.getFullYear(), h.getMonth(), 1)); } cargarFacturas(); }
     if (viewId === 'control') { iniciarQC(); pintarListaQC(); }
     if (viewId === 'monitoreo') { iniciarMonitoreo(); pintarMonitoreo(); }
     if (viewId === 'estadisticas') {
@@ -270,6 +277,7 @@ function iniciarListeners() {
             configReferencias = data.referencias || {};
             configLab = data.laboratorio || { nombre: "Laboratorio Clínico", telefono: "", direccion: "" };
             configEntrega = data.entrega || { auto_correo: false };
+            configFact = data.facturacion || {}; renderizarConfigFacturacion();
             renderizarConfiguracion(); actualizarSelectSeguros(); renderizarReferencias(); renderizarConfigEntrega();
             // Copia pública (solo nombre y contacto) para el encabezado del portal del paciente
             db.ref("portal_publico/laboratorio").set({ nombre: configLab.nombre || "", telefono: configLab.telefono || "", direccion: configLab.direccion || "", pie: configLab.pie || "", logo: configLab.logo || null }).catch(() => { });
@@ -627,10 +635,16 @@ async function generarOrden() {
         const metodoIni = document.getElementById('pago-metodo').value;
         ordenNueva.pagado = +pagoIni.toFixed(2); ordenNueva.saldo = +(t.total - pagoIni).toFixed(2);
         ordenNueva.estado_pago = ordenNueva.saldo <= 0 ? "Pagado" : (pagoIni > 0 ? "Parcial" : "Debe");
+        if (document.getElementById('fac-requiere').checked) {
+            const fnit = document.getElementById('fac-nit').value.trim(), frs = document.getElementById('fac-razon').value.trim();
+            if (!fnit || !frs) throw new Error("Complete el NIT/CI y la razón social de la factura (o desmarque 'Requiere factura').");
+            ordenNueva.factura = { nit: fnit, complemento: document.getElementById('fac-compl').value.trim(), razon_social: frs, importe: t.total, estado: "Pendiente" };
+        }
         if (pagoIni > 0) { ordenNueva.pagos = {}; ordenNueva.pagos["p" + Date.now()] = { monto: ordenNueva.pagado, metodo: metodoIni, fecha: ordenNueva.fecha_creacion, por: usuarioActual() }; }
         await db.ref("ordenes_pendientes/" + idMuestra).set(ordenNueva);
         if (pagoIni > 0) await registrarMovimientoCaja({ tipo: "pago", monto: ordenNueva.pagado, metodo: metodoIni, muestra: idMuestra, paciente: nombre, ci: ci, detalle: "Pago al crear la orden" });
         const pmr = document.getElementById('pago-monto'); delete pmr.dataset.tocado;
+        ['fac-nit', 'fac-compl', 'fac-razon'].forEach(i => document.getElementById(i).value = ""); document.getElementById('fac-requiere').checked = !!configFact.defecto; toggleFactura();
         ultimaOrden = Object.assign({ pin: acceso.pin, token: acceso.token, seguro_texto: seguroTexto }, ordenNueva);
         publicarOrdenEnPortal(idMuestra, ordenNueva).catch(e => console.warn("Portal:", e));
 
@@ -743,6 +757,7 @@ function enviarAccesoWhatsApp() {
 // =====================================================================
 //  VALIDACIÓN, AUDITORÍA Y NOTIFICACIONES
 // =====================================================================
+let configFact = {};
 let datosGlobales = {}; let ordenesGlobales = {}; let pacienteSeleccionadoId = null; let filtroActual = "Pendientes";
 let notificacionesPendientes = []; let unreadCount = 0; let keysAnteriores = new Set(); let primeraCarga = true;
 
@@ -1653,7 +1668,7 @@ function cargarScript(url) {
 }
 window.exportarHistorialCSV = async function () {
     if (!histFilas.length) return alert("Primero haga una búsqueda");
-    try { if (!window.ExcelJS) await cargarScript("https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"); }
+    try { if (!window.ExcelJS) await cargarScript("https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"); if (!window.ExcelJS) throw new Error("sin librería"); }
     catch (e) { return alert("No se pudo preparar el Excel. Revise su conexión a internet."); }
     const filtro = document.getElementById('hist-estado').value;
     const filas = histFilas.filter(f => !filtro || f.estado === filtro);
@@ -1984,7 +1999,7 @@ function pintarCierres() {
     el.innerHTML = ks.length ? "<b>Cierres registrados este día:</b>" + ks.map(k => { const c = cajaCierres[k]; return "<div style=\"border-top:1px dashed #E2E8F0; padding:4px 0;\">" + esc(new Date(c.fecha).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })) + " · " + esc(String(c.usuario).split("@")[0]) + " · contado " + bs(c.efectivo_contado) + " · dif. <b style=\"color:" + (Math.abs(c.diferencia) < 0.01 ? "#166534" : "#B91C1C") + "\">" + c.diferencia.toFixed(2) + "</b>" + (c.observacion ? "<br><small>" + esc(c.observacion) + "</small>" : "") + "</div>"; }).join("") : "";
 }
 window.exportarCajaExcel = async function () {
-    try { if (!window.ExcelJS) await cargarScript("https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"); } catch (e) { return alert("No se pudo preparar el Excel."); }
+    try { if (!window.ExcelJS) await cargarScript("https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"); if (!window.ExcelJS) throw new Error("sin librería"); } catch (e) { return alert("No se pudo preparar el Excel."); }
     const dia = document.getElementById('caja-dia').value, r = resumenCaja();
     const wb = new ExcelJS.Workbook(), ws = wb.addWorksheet("Caja " + dia);
     const AZUL = "FF0B4F8A", borde = { top: { style: "thin", color: { argb: "FFCBD5E1" } }, left: { style: "thin", color: { argb: "FFCBD5E1" } }, bottom: { style: "thin", color: { argb: "FFCBD5E1" } }, right: { style: "thin", color: { argb: "FFCBD5E1" } } };
@@ -2328,4 +2343,189 @@ window.usarPad = function () {
     imagenesPendientes.firma = url; mostrarPrev("firma", url);
     document.getElementById('pad-caja').style.display = "none";
     mostrarToast("Firma lista", "Presione 'Guardar' para que quede en sus informes.");
+};
+
+
+// =====================================================================
+//  LABORATORIOS CLIENTES (desde la plataforma, sin tocar GitHub)
+// =====================================================================
+let labsRegistro = {};
+function claveAzar(n) { const c = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"; let x = ""; crypto.getRandomValues(new Uint32Array(n)).forEach(v => x += c[v % c.length]); return x; }
+function leerFirebaseConfig(txt) {
+    const c = {};
+    ["apiKey", "authDomain", "databaseURL", "projectId", "storageBucket", "messagingSenderId", "appId"].forEach(k => { const m = String(txt).match(new RegExp(k + "\\s*:\\s*[\"']([^\"']+)[\"']")); if (m) c[k] = m[1]; });
+    return c;
+}
+function iniciarPanelLabs() {
+    db.ref("registro_labs").on("value", s => { labsRegistro = s.val() || {}; pintarLabs(); llenarSelectLabsInstalador(); });
+}
+function pintarLabs() {
+    const t = document.getElementById('tabla-labs'); if (!t) return;
+    const base = location.href.split("#")[0].split("?")[0].replace(/[^/]*$/, "");
+    const ks = Object.keys(labsRegistro).sort();
+    t.innerHTML = ks.length ? ks.map(k => { const l = labsRegistro[k], on = l.activo !== false, url = base + "?lab=" + k;
+        return "<tr><td><b>" + esc(l.nombre) + "</b><br><small>" + esc(k) + " · " + esc(l.firebase.projectId || "") + "</small></td><td><a href=\"" + esc(url) + "\" target=\"_blank\">" + esc(url) + "</a><br><small>Portal: " + esc(base + "portal.html?lab=" + k) + "</small></td><td>" + (on ? "<span class=\"status-pill val\">Activo</span>" : "<span class=\"status-pill rech\">Suspendido</span>") + "</td>" +
+            "<td class=\"acciones-usuario\"><button onclick=\"navigator.clipboard.writeText(" + jsArg(url) + ").then(()=>mostrarToast('Copiado', 'Enlace del LIS'))\">📋 Copiar enlace</button><button onclick=\"suspenderLab(" + jsArg(k) + ", " + on + ")\">" + (on ? "⏸ Suspender" : "▶ Reactivar") + "</button></td></tr>"; }).join("")
+        : "<tr><td colspan=\"4\" style=\"color:#888;\">Todavía no hay laboratorios clientes.</td></tr>";
+}
+window.guardarLaboratorioCliente = async function () {
+    const msg = document.getElementById('nl-msg');
+    const cod = document.getElementById('nl-codigo').value.trim().toLowerCase(), nombre = document.getElementById('nl-nombre').value.trim();
+    const c = leerFirebaseConfig(document.getElementById('nl-config').value);
+    const dburl = document.getElementById('nl-dburl').value.trim().replace(/\/$/, ""); if (dburl) c.databaseURL = dburl;
+    const err = [];
+    if (!/^[a-z0-9]{2,20}$/.test(cod)) err.push("El código: solo letras minúsculas y números, sin espacios ni tildes.");
+    if (window.AES_LABORATORIOS[cod]) err.push("Ese código ya está en uso.");
+    if (!nombre) err.push("Falta el nombre.");
+    if (!(c.apiKey || "").startsWith("AIza")) err.push("No encontré el apiKey: pegue todo el bloque firebaseConfig.");
+    if (!c.databaseURL) err.push("Falta el databaseURL: cópielo de Realtime Database → Data (empieza con https://) y péguelo en su casilla.");
+    if (c.projectId === window.AES_LAB_MAESTRO.firebase.projectId) err.push("Ese es el Firebase de SU laboratorio. Cada cliente necesita un proyecto nuevo.");
+    if (err.length) { msg.innerHTML = "<span style=\"color:#B91C1C\">" + err.map(esc).join("<br>") + "</span>"; return; }
+    msg.innerText = "Comprobando el Firebase del laboratorio...";
+    // Comprueba que la base exista y tenga las reglas (debe responder 401 = protegida)
+    try { const r = await fetch(c.databaseURL + "/.json?shallow=true"); if (r.status !== 401 && r.status !== 200) throw new Error("respuesta " + r.status); if (r.status === 200) msg.innerText = "⚠️ Ojo: la base de ese laboratorio está ABIERTA. Pegue las reglas de seguridad en su Firebase. "; }
+    catch (e) { msg.innerHTML = "<span style=\"color:#B91C1C\">No se pudo conectar con " + esc(c.databaseURL) + ". Revise el databaseURL. (" + esc(e.message) + ")</span>"; return; }
+    await db.ref("registro_labs/" + cod).set({ nombre: nombre, firebase: c, webhook_make: "", activo: true, creado: new Date().toISOString(), creado_por: usuarioActual() });
+    ['nl-codigo', 'nl-nombre', 'nl-config', 'nl-dburl'].forEach(i => document.getElementById(i).value = "");
+    msg.innerHTML += "<span style=\"color:#166534\">✔ Laboratorio guardado. Abra su enlace, entre primero usted (quedará como Propietario de ese laboratorio) y cree sus usuarios.</span>";
+};
+window.suspenderLab = function (k, suspender) {
+    if (!confirm((suspender ? "¿SUSPENDER" : "¿Reactivar") + " el laboratorio " + labsRegistro[k].nombre + "?" + (suspender ? "\n\nSu personal verá 'Servicio suspendido' (el portal de pacientes sigue funcionando)." : ""))) return;
+    db.ref("registro_labs/" + k + "/activo").set(!suspender);
+};
+
+// =====================================================================
+//  INSTALACIÓN DEL MOTOR PRECONFIGURADA
+// =====================================================================
+let equiposInst = [];
+function iniciarPanelInstalador() { if (!equiposInst.length) { equiposInst = [{ nombre: "IMMULITE 2000 XPi", conexion: "serie", puerto: "COM3", baudios: "9600", id_equipo: "IMMULITE", plantilla: true }]; } pintarEquiposInst(); llenarSelectLabsInstalador(); }
+function llenarSelectLabsInstalador() {
+    const sel = document.getElementById('im-lab'); if (!sel) return; const v = sel.value;
+    let h = "<option value=\"__actual\">" + esc(window.AES_LAB.nombre || "Este laboratorio") + " (actual)</option>";
+    if (window.AES_LAB_ES_PRIMERO) Object.keys(labsRegistro).sort().forEach(k => h += "<option value=\"" + esc(k) + "\">" + esc(labsRegistro[k].nombre) + "</option>");
+    sel.innerHTML = h; if (v) sel.value = v;
+}
+function pintarEquiposInst() {
+    const box = document.getElementById('im-equipos'); if (!box) return;
+    box.innerHTML = equiposInst.map((e, i) => "<div class=\"eq-fila\">" +
+        "<div><label>Nombre del equipo</label><input value=\"" + esc(e.nombre) + "\" oninput=\"equiposInst[" + i + "].nombre=this.value\"></div>" +
+        "<div><label>Conexión</label><select onchange=\"equiposInst[" + i + "].conexion=this.value; equiposInst[" + i + "].puerto=this.value==='red'?'" + (5555 + i) + "':'COM3'; pintarEquiposInst()\"><option value=\"serie\"" + (e.conexion === "serie" ? " selected" : "") + ">Cable serie RS-232</option><option value=\"red\"" + (e.conexion === "red" ? " selected" : "") + ">Cable de red</option></select></div>" +
+        "<div><label>" + (e.conexion === "red" ? "Puerto TCP" : "Puerto COM") + "</label><input value=\"" + esc(e.puerto) + "\" oninput=\"equiposInst[" + i + "].puerto=this.value\"></div>" +
+        "<div><label>Baudios</label><input value=\"" + esc(e.baudios) + "\" " + (e.conexion === "red" ? "disabled" : "") + " oninput=\"equiposInst[" + i + "].baudios=this.value\"></div>" +
+        "<div><label>ID equipo</label><input value=\"" + esc(e.id_equipo) + "\" oninput=\"equiposInst[" + i + "].id_equipo=this.value\"></div>" +
+        "<div><label>Códigos IMMULITE</label><input type=\"checkbox\" style=\"width:20px;height:20px;\" " + (e.plantilla ? "checked" : "") + " onchange=\"equiposInst[" + i + "].plantilla=this.checked\"></div>" +
+        "<div><button type=\"button\" class=\"btn-mini\" onclick=\"equiposInst.splice(" + i + ",1); pintarEquiposInst()\">🗑️</button></div></div>").join("") || "<p style=\"color:#888; font-size:.85rem;\">Sin equipos.</p>";
+}
+window.agregarEquipoInstalador = function () { equiposInst.push({ nombre: "Equipo " + (equiposInst.length + 1), conexion: "red", puerto: String(5555 + equiposInst.length), baudios: "9600", id_equipo: "", plantilla: false }); pintarEquiposInst(); };
+window.descargarInstalacion = async function () {
+    const lab = document.getElementById('im-lab').value;
+    const L = lab === "__actual" ? { codigo: window.AES_LAB_CODIGO, nombre: window.AES_LAB.nombre, firebase: window.AES_LAB.firebase } : { codigo: lab, nombre: labsRegistro[lab].nombre, firebase: labsRegistro[lab].firebase };
+    const correo = document.getElementById('im-correo').value.trim().toLowerCase(), clave = document.getElementById('im-clave').value;
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(correo)) return alert("Escriba el correo del usuario del motor (ej: motor@milab.lis)");
+    if (clave.length < 6) return alert("La contraseña del motor debe tener al menos 6 caracteres (use el 🎲)");
+    if (!equiposInst.length) return alert("Agregue al menos un equipo");
+    // Crea (o comprueba) el usuario del motor en el Firebase de ese laboratorio
+    try {
+        const nom = "inst_" + L.codigo; const app2 = firebase.apps.find(a => a.name === nom) || firebase.initializeApp(L.firebase, nom);
+        if (document.getElementById('im-crear').checked) {
+            try { await app2.auth().createUserWithEmailAndPassword(correo, clave); mostrarToast("Usuario del motor creado", correo); }
+            catch (e) { if (e.code !== "auth/email-already-in-use") throw e; await app2.auth().signInWithEmailAndPassword(correo, clave); }
+        } else await app2.auth().signInWithEmailAndPassword(correo, clave);
+        await app2.auth().signOut();
+    } catch (e) {
+        const t = { "auth/wrong-password": "Ese usuario del motor ya existe con OTRA contraseña.", "auth/invalid-login-credentials": "Ese usuario del motor ya existe con OTRA contraseña (o no existe).", "auth/operation-not-allowed": "En el Firebase de ese laboratorio falta activar Authentication → Email/Password.", "auth/configuration-not-found": "En el Firebase de ese laboratorio falta activar Authentication (Get started → Email/Password)." };
+        return alert("No se pudo preparar el usuario del motor:\n\n" + (t[e.code] || e.message));
+    }
+    const gmail = document.getElementById('im-gmail').value.trim();
+    const datos = {
+        tipo: "AES_INSTALACION", version: 1, generado: new Date().toISOString(), por: usuarioActual(),
+        laboratorio: { codigo: L.codigo, nombre: L.nombre }, pc: document.getElementById('im-pc').value.trim(),
+        firebase: { database_url: L.firebase.databaseURL, api_key: L.firebase.apiKey },
+        motor: { correo: correo, contrasena: clave },
+        equipos: equiposInst.map(e => ({ nombre: e.nombre, conexion: e.conexion, puerto_tcp: e.conexion === "red" ? parseInt(e.puerto, 10) || 5555 : 5555, com: e.conexion === "serie" ? e.puerto.toUpperCase() : "COM3", baudios: parseInt(e.baudios, 10) || 9600, id_equipo: e.id_equipo, plantilla_immulite: !!e.plantilla })),
+        correo: { activo: !!gmail, gmail: gmail, clave_app: document.getElementById('im-gclave').value.replace(/\s/g, ""), nombre_remitente: document.getElementById('im-remitente').value.trim() || L.nombre },
+        respaldo: { activo: true, hora: document.getElementById('im-hora').value.trim() || "23:30" }
+    };
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify(datos, null, 2)], { type: "application/json" }));
+    a.download = "aes_instalacion_" + L.codigo + ".json"; document.body.appendChild(a); a.click(); a.remove();
+    alert("✔ Archivo descargado: aes_instalacion_" + L.codigo + ".json\n\nCópielo en el USB, DENTRO de la carpeta del instalador (junto a INSTALAR_AES_LIS.bat).\nEn la PC del equipo: doble clic en INSTALAR_AES_LIS.bat y listo.");
+};
+
+// =====================================================================
+//  FACTURACIÓN
+// =====================================================================
+let facOrdenes = {};
+window.toggleFactura = function () {
+    const on = document.getElementById('fac-requiere').checked;
+    document.getElementById('fac-datos').style.display = on ? "grid" : "none";
+    if (on) {
+        if (!document.getElementById('fac-nit').value) document.getElementById('fac-nit').value = document.getElementById('ci').value.trim();
+        if (!document.getElementById('fac-razon').value) document.getElementById('fac-razon').value = document.getElementById('nombre').value.trim().toUpperCase();
+    }
+};
+function renderizarConfigFacturacion() {
+    const m = { 'fc-nit': 'nit', 'fc-razon': 'razon_social', 'fc-modalidad': 'modalidad', 'fc-actividad': 'actividad', 'fc-producto': 'producto', 'fc-sucursal': 'sucursal' };
+    Object.keys(m).forEach(id => { const el = document.getElementById(id); if (el && configFact[m[id]] !== undefined) el.value = configFact[m[id]]; });
+    const d = document.getElementById('fc-defecto'); if (d) d.checked = !!configFact.defecto;
+    const r = document.getElementById('fac-requiere'); if (r && !r.dataset.tocado && !document.getElementById('fac-nit').value) { r.checked = !!configFact.defecto; toggleFactura(); }
+}
+window.guardarConfigFacturacion = function () {
+    const g = id => document.getElementById(id).value.trim();
+    db.ref("configuracion/facturacion").set({ nit: g('fc-nit'), razon_social: g('fc-razon'), modalidad: g('fc-modalidad'), actividad: g('fc-actividad'), producto: g('fc-producto'), sucursal: g('fc-sucursal'), defecto: document.getElementById('fc-defecto').checked })
+        .then(() => mostrarToast("Facturación", "Datos guardados."));
+};
+window.cargarFacturas = async function () {
+    const d = document.getElementById('fac-desde').value, h = document.getElementById('fac-hasta').value;
+    const ords = (await db.ref("ordenes_pendientes").orderByChild("fecha_creacion").startAt(new Date(d + "T00:00:00").toISOString()).endAt(new Date(h + "T23:59:59").toISOString()).once("value")).val() || {};
+    facOrdenes = {}; Object.keys(ords).forEach(k => { if (ords[k].factura) facOrdenes[k] = ords[k]; });
+    pintarFacturas();
+};
+window.pintarFacturas = function () {
+    const f = document.getElementById('fac-filtro').value;
+    const lista = Object.values(facOrdenes).filter(o => !f || o.factura.estado === f).sort((a, b) => String(b.fecha_creacion).localeCompare(String(a.fecha_creacion)));
+    const todas = Object.values(facOrdenes), sum = e => todas.filter(o => o.factura.estado === e).reduce((a, o) => a + (Number(o.factura.importe) || 0), 0), cnt = e => todas.filter(o => o.factura.estado === e).length;
+    const t = (ti, v, c) => "<div class=\"caja-tarjeta " + (c || "") + "\"><div class=\"t\">" + ti + "</div><div class=\"v\">" + v + "</div></div>";
+    document.getElementById('fac-tarjetas').innerHTML = t("Por facturar", cnt("Pendiente") + " · " + bs(sum("Pendiente")), cnt("Pendiente") ? "rojo" : "verde") + t("Emitidas", cnt("Emitida") + " · " + bs(sum("Emitida")), "verde") + t("Anuladas", cnt("Anulada"));
+    const pill = { Pendiente: "pend", Emitida: "val", Anulada: "rech" };
+    document.getElementById('fac-cuerpo').innerHTML = lista.map(o => { const x = o.factura, m = o.id_muestra;
+        return "<tr><td>" + esc(new Date(o.fecha_creacion).toLocaleDateString()) + "</td><td>" + esc(m) + "</td><td>" + esc(x.nit) + (x.complemento ? "-" + esc(x.complemento) : "") + "</td><td>" + esc(x.razon_social) + "</td><td style=\"text-align:right;font-weight:bold;\">" + bs(x.importe) + "</td><td><span class=\"status-pill " + pill[x.estado] + "\">" + esc(x.estado) + "</span></td><td>" + esc(x.numero || "") + (x.cuf ? "<br><small style=\"word-break:break-all;\">" + esc(x.cuf) + "</small>" : "") + (x.motivo_anulacion ? "<br><small>" + esc(x.motivo_anulacion) + "</small>" : "") + "</td>" +
+            "<td class=\"acciones-usuario\"><button onclick=\"copiarFactura(" + jsArg(m) + ")\">📋 Copiar datos</button>" + (x.estado === "Pendiente" ? "<button onclick=\"marcarEmitida(" + jsArg(m) + ")\">✔ Emitida</button>" : "") + (x.estado === "Emitida" && esAdmin() ? "<button onclick=\"anularFactura(" + jsArg(m) + ")\">Anular</button>" : "") + "</td></tr>"; }).join("")
+        || "<tr><td colspan=\"8\" style=\"text-align:center;color:#888;padding:15px;\">No hay órdenes con factura en esas fechas.</td></tr>";
+};
+window.copiarFactura = function (m) {
+    const o = facOrdenes[m], x = o.factura;
+    const t = "NIT/CI: " + x.nit + (x.complemento ? "  Complemento: " + x.complemento : "") + "\nRazón social: " + x.razon_social + "\nDetalle: Servicio de análisis clínico de laboratorio (" + (o.examenes || []).join(", ") + ")\nImporte: " + Number(x.importe).toFixed(2) + " Bs\nOrden: " + m;
+    navigator.clipboard.writeText(t).then(() => mostrarToast("📋 Copiado", "Péguelo en el Portal Web o SIAT Desktop")).catch(() => prompt("Copie (Ctrl + C):", t));
+};
+window.marcarEmitida = async function (m) {
+    const num = prompt("N° de factura emitida en el SIAT:"); if (!num) return;
+    const cuf = prompt("CUF o código de autorización (opcional, puede dejarlo vacío):") || "";
+    await db.ref("ordenes_pendientes/" + m + "/factura").update({ estado: "Emitida", numero: num.trim(), cuf: cuf.trim(), fecha_emision: new Date().toISOString(), emitida_por: usuarioActual() });
+    facOrdenes[m].factura = Object.assign(facOrdenes[m].factura, { estado: "Emitida", numero: num.trim(), cuf: cuf.trim() }); pintarFacturas();
+};
+window.anularFactura = async function (m) {
+    const mot = prompt("Motivo de anulación (recuerde anularla también en el SIAT):"); if (!mot) return;
+    await db.ref("ordenes_pendientes/" + m + "/factura").update({ estado: "Anulada", motivo_anulacion: mot, anulada_por: usuarioActual(), fecha_anulacion: new Date().toISOString() });
+    facOrdenes[m].factura.estado = "Anulada"; facOrdenes[m].factura.motivo_anulacion = mot; pintarFacturas();
+};
+window.exportarVentasExcel = async function () {
+    const lista = Object.values(facOrdenes).sort((a, b) => String(a.fecha_creacion).localeCompare(String(b.fecha_creacion)));
+    if (!lista.length) return alert("Primero busque un rango con facturas");
+    try { if (!window.ExcelJS) await cargarScript("https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"); if (!window.ExcelJS) throw new Error("sin librería"); } catch (e) { return alert("No se pudo preparar el Excel."); }
+    const wb = new ExcelJS.Workbook(), ws = wb.addWorksheet("Ventas");
+    const AZUL = "FF0B4F8A", borde = { top: { style: "thin", color: { argb: "FFCBD5E1" } }, left: { style: "thin", color: { argb: "FFCBD5E1" } }, bottom: { style: "thin", color: { argb: "FFCBD5E1" } }, right: { style: "thin", color: { argb: "FFCBD5E1" } } };
+    ws.columns = [{ width: 6 }, { width: 12 }, { width: 13 }, { width: 30 }, { width: 14 }, { width: 8 }, { width: 34 }, { width: 13 }, { width: 11 }, { width: 14 }];
+    ws.mergeCells("A1:J1"); ws.getCell("A1").value = (configFact.razon_social || configLab.nombre || "").toUpperCase() + (configFact.nit ? "  —  NIT " + configFact.nit : ""); ws.getCell("A1").font = { size: 14, bold: true, color: { argb: "FFFFFFFF" } }; ws.getCell("A1").fill = { type: "pattern", pattern: "solid", fgColor: { argb: AZUL } }; ws.getCell("A1").alignment = { horizontal: "center" }; ws.getRow(1).height = 24;
+    ws.mergeCells("A2:J2"); ws.getCell("A2").value = "REPORTE DE VENTAS DE SERVICIOS — " + document.getElementById('fac-desde').value.split("-").reverse().join("/") + " al " + document.getElementById('fac-hasta').value.split("-").reverse().join("/"); ws.getCell("A2").font = { bold: true, color: { argb: AZUL } }; ws.getCell("A2").alignment = { horizontal: "center" };
+    ws.mergeCells("A3:J3"); ws.getCell("A3").value = "Documento de control interno (base para conciliar con el Registro de Compras y Ventas del SIAT). Generado " + new Date().toLocaleString(); ws.getCell("A3").font = { size: 9, italic: true, color: { argb: "FF64748B" } }; ws.getCell("A3").alignment = { horizontal: "center" };
+    const h = ws.getRow(5); h.values = ["N°", "Fecha", "N° factura", "CUF / Cód. autorización", "NIT / CI", "Compl.", "Nombre o razón social", "Importe (Bs)", "Estado", "N° orden"];
+    h.eachCell(c => { c.font = { bold: true, color: { argb: "FFFFFFFF" } }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: AZUL } }; c.border = borde; c.alignment = { horizontal: "center", vertical: "middle", wrapText: true }; }); h.height = 28;
+    let tot = 0;
+    lista.forEach((o, i) => { const x = o.factura; if (x.estado === "Emitida") tot += Number(x.importe) || 0;
+        const r = ws.addRow([i + 1, new Date(o.fecha_creacion).toLocaleDateString(), x.numero || "", x.cuf || "", x.nit, x.complemento || "", x.razon_social, Number(x.importe) || 0, x.estado, o.id_muestra]);
+        r.getCell(8).numFmt = '#,##0.00'; r.eachCell({ includeEmpty: true }, c => { c.border = borde; if (i % 2) c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } }; });
+        if (x.estado === "Anulada") r.font = { color: { argb: "FF94A3B8" }, strike: true }; if (x.estado === "Pendiente") r.getCell(9).font = { bold: true, color: { argb: "FFB91C1C" } }; });
+    const tr = ws.addRow(["", "", "", "", "", "", "TOTAL EMITIDO", tot, "", ""]); tr.font = { bold: true }; tr.getCell(8).numFmt = '#,##0.00';
+    ws.autoFilter = { from: { row: 5, column: 1 }, to: { row: 5 + lista.length, column: 10 } }; ws.views = [{ state: "frozen", ySplit: 5 }];
+    const buf = await wb.xlsx.writeBuffer(); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([buf])); a.download = "Ventas_" + document.getElementById('fac-desde').value + "_" + document.getElementById('fac-hasta').value + ".xlsx"; document.body.appendChild(a); a.click(); a.remove();
 };
