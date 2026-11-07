@@ -7,8 +7,9 @@
 //  las REGLAS de la base de datos: ver archivo firebase_reglas.json)
 // Los datos de Firebase de cada laboratorio están en js/laboratorios.js
 const firebaseConfig = window.AES_LAB.firebase;
+const VERSION_WEB = "6.1";   // súbalo junto con ?v= en index.html
 firebase.initializeApp(firebaseConfig);
-try { document.getElementById('login-lab').innerText = window.AES_LAB.nombre || ''; } catch (e) { }
+try { document.getElementById('login-lab').innerText = window.AES_LAB.nombre || ''; document.getElementById('version-web').innerText = 'v' + VERSION_WEB; } catch (e) { }
 const db = firebase.database();
 const auth = firebase.auth();
 
