@@ -90,6 +90,7 @@ auth.onAuthStateChanged(async user => {
             if (!hay) {
                 perfil = { email: user.email, nombre: user.email.split("@")[0], rol: "admin", activo: true, creado: new Date().toISOString() };
                 await db.ref("usuarios/" + user.uid).set(perfil);
+                await db.ref("propietario_uid").set(user.uid).catch(() => { });
             }
         }
         if (bloq || !perfil || perfil.activo === false || !ROLES[perfil.rol]) {
@@ -1140,7 +1141,7 @@ async function renderizarEntrega(key) {
     if (pacienteSeleccionadoId !== key) return;
     cont.innerHTML = "<div class=\"entrega-fila\"><span>🌐 Portal</span><b>" + f(e.portal) + "</b></div>" +
         "<div class=\"entrega-fila\"><span>📱 WhatsApp " + esc(c.celular ? "(+" + normalizarCelular(c.celular) + ")" : "(sin número)") + "</span><b>" + f(e.whatsapp) + "</b></div>" +
-        "<div class=\"entrega-fila\"><span>✉️ Correo " + esc(c.correo ? "(" + c.correo + ")" : "(sin correo)") + "</span><b>" + f(e.correo) + "</b></div>";
+        "<div class=\"entrega-fila\"><span>✉️ Correo " + esc(c.correo ? "(" + c.correo + ")" : "(sin correo)") + "</span><b>" + (e.correo_estado && !(e.correo && e.correo_estado === "Enviado") ? esc(e.correo_estado) + (e.correo ? "<br><small>último: " + f(e.correo) + "</small>" : "") : f(e.correo)) + "</b></div>";
 }
 
 async function pedirDato(ci, campo, texto, validar) {
@@ -1201,11 +1202,18 @@ async function enviarCorreoResultados(keyParam, automatico) {
             asunto: "Resultados de laboratorio - " + d.lab.nombre, mensaje_html: html,
             pdf_nombre: opt.filename, pdf_base64: pdf64, enlace_portal: enlace, laboratorio_nombre: d.lab.nombre, fecha: new Date().toLocaleString()
         };
-        const res = await fetch(WEBHOOK_AUTOPEDIDO, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-        if (!res.ok) throw new Error("Make respondió " + res.status);
-        await db.ref("resultados/" + key + "/entregas/correo").set(new Date().toISOString());
-        await registrarAuditoria(key, "Enviado por correo", correo);
-        mostrarToast("Correo enviado", correo);
+        if (metodoCorreo() === "motor") {
+            await encolarCorreo({ tipo: "resultados", para: correo, asunto: payload.asunto, html: html, pdf_nombre: opt.filename, pdf_base64: pdf64, resultado_key: key });
+            await db.ref("resultados/" + key + "/entregas/correo_estado").set("En cola (lo envía el motor)");
+            await registrarAuditoria(key, "Correo puesto en cola", correo);
+            mostrarToast("Correo en cola", "El motor lo enviará a " + correo + " en unos segundos.");
+        } else {
+            const res = await fetch(WEBHOOK_AUTOPEDIDO, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+            if (!res.ok) throw new Error("Make respondió " + res.status);
+            await db.ref("resultados/" + key + "/entregas/correo").set(new Date().toISOString());
+            await registrarAuditoria(key, "Enviado por correo", correo);
+            mostrarToast("Correo enviado", correo);
+        }
         if (pacienteSeleccionadoId === key) renderizarEntrega(key);
     } catch (e) {
         console.error(e);
@@ -1222,8 +1230,20 @@ async function copiarEnlacePortal() {
     navigator.clipboard.writeText(texto).then(() => mostrarToast("Enlace copiado", texto)).catch(() => prompt("Copie el enlace:", texto));
 }
 
+function metodoCorreo() { return configEntrega.metodo_correo === "motor" ? "motor" : "make"; }
+async function encolarCorreo(datos) {
+    datos.estado = "pendiente"; datos.creado = new Date().toISOString(); datos.por = usuarioActual(); datos.intentos = 0;
+    return db.ref("cola_correos").push(datos);
+}
+window.correoPruebaMotor = async function () {
+    const para = prompt("¿A qué correo envío la prueba?", (auth.currentUser && auth.currentUser.email) || "");
+    if (!para) return;
+    await encolarCorreo({ tipo: "prueba", para: para, asunto: "Prueba de correo - AES LIS", html: "<p>Si recibió este correo, el motor envía correos correctamente. ✔</p><p>" + esc(configLab.nombre || "") + "</p>" });
+    mostrarToast("Prueba en cola", "Si el motor está bien configurado, llegará en menos de 1 minuto.");
+};
 function guardarConfigEntrega() {
     configEntrega.auto_correo = document.getElementById('conf-auto-correo').checked;
+    configEntrega.metodo_correo = document.getElementById('conf-metodo-correo').value;
     db.ref("configuracion/entrega").set(configEntrega).then(() => mostrarToast("Entrega", "Configuración guardada."));
 }
 // Envía a Make un ejemplo con TODOS los campos, para que Make "aprenda" los datos nuevos
@@ -1244,6 +1264,7 @@ function enviarPruebaMake() {
 function renderizarConfigEntrega() {
     const cdv = document.getElementById("conf-dias-ventana"); if (cdv) cdv.value = diasVentana();
     const chk = document.getElementById('conf-auto-correo'); if (chk) chk.checked = !!configEntrega.auto_correo;
+    const mc = document.getElementById('conf-metodo-correo'); if (mc) mc.value = metodoCorreo();
     const u = document.getElementById('conf-url-portal'); if (u) { u.innerText = urlPortal(); u.href = urlPortal(); }
 }
 
@@ -1462,6 +1483,13 @@ function enviarWebhook(codigo, item, hoyStr) {
     };
 
     mostrarToast("Auto-Pedido", "Enviando pedido al proveedor de " + item.nombre + "...");
+    if (metodoCorreo() === "motor") {
+        if (!item.correo_proveedor) return alert("El producto " + item.nombre + " no tiene correo del proveedor.");
+        encolarCorreo({ tipo: "autopedido", para: item.correo_proveedor, asunto: "Pedido de reactivos - " + (configLab.nombre || "") + " - " + item.nombre, html: mensajeHTML, inventario_codigo: codigo })
+            .then(() => { db.ref("inventario/" + codigo + "/ultimo_pedido").set(hoyStr); mostrarToast("Auto-Pedido en cola", "El motor lo enviará a " + item.correo_proveedor); })
+            .catch(e => alert("⚠️ No se pudo poner en cola el pedido: " + e.message));
+        return;
+    }
     fetch(WEBHOOK_AUTOPEDIDO, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
         .then(res => {
             if (!res.ok) throw new Error("Make respondió " + res.status);
@@ -1674,16 +1702,17 @@ window.exportarHistorialCSV = async function () {
 
 
 // ---------- Panel de usuarios (solo Administrador) ----------
-let usuariosGlobal = {}, solicitudesGlobal = {}, bloqueadosGlobal = {}, panelUsuariosActivo = false;
+let usuariosGlobal = {}, solicitudesGlobal = {}, bloqueadosGlobal = {}, panelUsuariosActivo = false, propietarioUid = null;
 function iniciarPanelUsuarios() {
     if (panelUsuariosActivo) return; panelUsuariosActivo = true;
     db.ref("usuarios").on("value", s => { usuariosGlobal = s.val() || {}; renderizarUsuarios(); });
     db.ref("usuarios_solicitudes").on("value", s => { solicitudesGlobal = s.val() || {}; renderizarUsuarios(); });
     db.ref("usuarios_bloqueados").on("value", s => { bloqueadosGlobal = s.val() || {}; renderizarUsuarios(); });
+    db.ref("propietario_uid").on("value", s => { propietarioUid = s.val(); renderizarUsuarios(); });
 }
 function detenerPanelUsuarios() {
     if (!panelUsuariosActivo) return; panelUsuariosActivo = false;
-    ["usuarios", "usuarios_solicitudes", "usuarios_bloqueados"].forEach(r => db.ref(r).off());
+    ["usuarios", "usuarios_solicitudes", "usuarios_bloqueados", "propietario_uid"].forEach(r => db.ref(r).off());
 }
 function opcionesRol(sel) { return Object.keys(ROLES).map(r => "<option value=\"" + r + "\"" + (r === sel ? " selected" : "") + ">" + ROLES[r].nombre + "</option>").join(""); }
 function renderizarUsuarios() {
@@ -1691,14 +1720,15 @@ function renderizarUsuarios() {
     const yo = auth.currentUser ? auth.currentUser.uid : "";
     const filas = Object.keys(usuariosGlobal).sort((a, b) => String(usuariosGlobal[a].nombre || "").localeCompare(String(usuariosGlobal[b].nombre || ""))).map(uid => {
         const u = usuariosGlobal[uid]; const activo = u.activo !== false && !bloqueadosGlobal[uid];
-        const esYo = uid === yo;
+        const esYo = uid === yo, esDueno = uid === propietarioUid, intocable = esYo || esDueno;
         return "<tr" + (activo ? "" : " class=\"usuario-inactivo\"") + "><td><b>" + esc(u.nombre || "") + "</b>" + (esYo ? " <small>(usted)</small>" : "") + "</td><td>" + esc(u.email || "") + "</td>" +
-            "<td><select onchange=\"cambiarRolUsuario(" + jsArg(uid) + ", this.value)\"" + (esYo ? " disabled" : "") + ">" + opcionesRol(u.rol) + "</select></td>" +
+            "<td><select onchange=\"cambiarRolUsuario(" + jsArg(uid) + ", this.value)\"" + (intocable ? " disabled" : "") + ">" + opcionesRol(u.rol) + "</select></td>" +
             "<td>" + (activo ? "<span class=\"status-pill val\">Activo</span>" : "<span class=\"status-pill rech\">Desactivado</span>") + "</td>" +
-            "<td class=\"acciones-usuario\">" + (esYo ? "" : "<button onclick=\"activarUsuario(" + jsArg(uid) + ", " + (!activo) + ")\">" + (activo ? "Desactivar" : "Activar") + "</button>") +
-            "<button onclick=\"resetearClave(" + jsArg(u.email || "") + ")\">Enviar cambio de contraseña</button>" + (esYo ? "" : "<button onclick=\"quitarUsuario(" + jsArg(uid) + ")\" title=\"Quitar de la lista (también lo bloquea)\">🗑️</button>") + "</td></tr>";
+            "<td class=\"acciones-usuario\">" + (intocable ? "" : "<button onclick=\"activarUsuario(" + jsArg(uid) + ", " + (!activo) + ")\">" + (activo ? "Desactivar" : "Activar") + "</button>") +
+            "<button onclick=\"resetearClave(" + jsArg(u.email || "") + ")\">Enviar cambio de contraseña</button>" + (intocable ? "" : "<button onclick=\"quitarUsuario(" + jsArg(uid) + ")\" title=\"Quitar de la lista (también lo bloquea)\">🗑️</button>") + "</td></tr>";
     }).join("");
     t.innerHTML = filas || "<tr><td colspan=\"5\">Sin usuarios</td></tr>";
+    const bp = document.getElementById('btn-propietario'); if (bp) bp.style.display = propietarioUid ? "none" : "inline-block";
     const sol = document.getElementById('tabla-solicitudes'), caja = document.getElementById('caja-solicitudes');
     const ks = Object.keys(solicitudesGlobal).filter(uid => !usuariosGlobal[uid]);
     caja.style.display = ks.length ? "block" : "none";
@@ -1779,4 +1809,10 @@ window.quitarUsuario = async function (uid) {
     const upd = {}; upd["usuarios/" + uid] = null; upd["usuarios_bloqueados/" + uid] = true;
     await db.ref().update(upd);
     db.ref("auditoria_usuarios").push({ accion: "Quitado de la lista", usuario_afectado: u.email || uid, por: usuarioActual(), fecha: new Date().toISOString() });
+};
+
+window.reclamarPropietario = async function () {
+    if (!confirm("¿Marcar SU cuenta (" + usuarioActual() + ") como Propietario del sistema?\n\nEl Propietario no puede ser desactivado ni cambiado por otros administradores. Esto se hace una sola vez.")) return;
+    try { await db.ref("propietario_uid").set(auth.currentUser.uid); mostrarToast("👑 Propietario", "Su cuenta quedó protegida."); }
+    catch (e) { alert("No se pudo: " + e.message + "\n\n¿Ya publicó las reglas nuevas de Firebase?"); }
 };
