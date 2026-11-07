@@ -1847,6 +1847,7 @@ function registrarMovimientoCaja(m) {
 function bs(n) { return (Number(n) || 0).toFixed(2) + " Bs"; }
 window.cargarCaja = async function () {
     const inp = document.getElementById('caja-dia'); if (!inp.value) inp.value = fechaLocalISO();
+    const ce = document.getElementById('cierre-efectivo'); if (ce) delete ce.dataset.tocado;
     const dia = inp.value;
     if (cajaRef) cajaRef.off();
     cajaRef = db.ref("caja_movimientos").orderByChild("dia").equalTo(dia);
@@ -1929,8 +1930,13 @@ window.anularMovimiento = async function (k) {
 };
 window.previewCierre = function () {
     const el = document.getElementById('cierre-diferencia'); if (!el) return;
-    const v = document.getElementById('cierre-efectivo').value;
-    const sis = resumenCaja().metodos["Efectivo"] || 0;
+    const r = resumenCaja(), inp = document.getElementById('cierre-efectivo');
+    const sis = r.metodos["Efectivo"] || 0;
+    // Ya viene cargado con lo del sistema; el usuario solo lo corrige si al contar no coincide
+    if (!inp.dataset.tocado) inp.value = sis.toFixed(2);
+    document.getElementById('cierre-resumen').innerHTML = METODOS_PAGO.map(m => "<div class=\"fila-cierre\"><span>" + m + "</span><b>" + bs(r.metodos[m]) + "</b></div>").join("") +
+        "<div class=\"fila-cierre total\"><span>TOTAL COBRADO</span><b>" + bs(r.neto) + "</b></div>";
+    const v = inp.value;
     if (v === "") { el.innerHTML = "Efectivo según el sistema: <b>" + bs(sis) + "</b>"; el.style.color = "#334155"; return; }
     const d = (num(v) || 0) - sis;
     el.innerHTML = "Sistema: " + bs(sis) + " · Contado: " + bs(num(v)) + "<br>Diferencia: <b>" + (d >= 0 ? "+" : "") + d.toFixed(2) + " Bs</b> " + (Math.abs(d) < 0.01 ? "✔ cuadra" : (d > 0 ? "(sobra)" : "(falta)"));
@@ -1938,10 +1944,11 @@ window.previewCierre = function () {
 };
 window.cerrarCaja = async function () {
     const dia = document.getElementById('caja-dia').value, v = document.getElementById('cierre-efectivo').value;
-    if (v === "") return alert("Escriba el efectivo contado");
+    if (v === "") return alert("Escriba el efectivo del cajón");
     const r = resumenCaja(); const contado = num(v) || 0;
+    if (!confirm("¿Registrar el cierre de caja del " + dia.split("-").reverse().join("/") + "?\n\nTotal cobrado: " + bs(r.neto) + "\nEfectivo en cajón: " + bs(contado))) return;
     await db.ref("caja_cierres/" + dia).push({ fecha: new Date().toISOString(), usuario: usuarioActual(), neto_sistema: +r.neto.toFixed(2), por_metodo: r.metodos, efectivo_sistema: +(r.metodos["Efectivo"] || 0).toFixed(2), efectivo_contado: contado, diferencia: +(contado - (r.metodos["Efectivo"] || 0)).toFixed(2), observacion: document.getElementById('cierre-obs').value.trim(), movimientos: r.n });
-    document.getElementById('cierre-efectivo').value = ""; document.getElementById('cierre-obs').value = ""; previewCierre();
+    const ce = document.getElementById('cierre-efectivo'); delete ce.dataset.tocado; document.getElementById('cierre-obs').value = ""; previewCierre();
     mostrarToast("Caja cerrada", "Cierre del " + dia + " registrado.");
 };
 function pintarCierres() {
