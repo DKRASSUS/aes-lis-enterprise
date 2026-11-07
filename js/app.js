@@ -5,22 +5,16 @@
 // === CONEXIÓN FIREBASE ===
 // (La apiKey de Firebase es pública por diseño. La seguridad real la dan
 //  las REGLAS de la base de datos: ver archivo firebase_reglas.json)
-const firebaseConfig = {
-    apiKey: "AIzaSyBLuIk-gKICLWlLSdWNAsnVYPXxqvroijI",
-    authDomain: "lis-aes.firebaseapp.com",
-    databaseURL: "https://lis-aes-default-rtdb.firebaseio.com",
-    projectId: "lis-aes",
-    storageBucket: "lis-aes.firebasestorage.app",
-    messagingSenderId: "333107041449",
-    appId: "1:333107041449:web:e498022d3e04e876f9c5b8"
-};
+// Los datos de Firebase de cada laboratorio están en js/laboratorios.js
+const firebaseConfig = window.AES_LAB.firebase;
 firebase.initializeApp(firebaseConfig);
+try { document.getElementById('login-lab').innerText = window.AES_LAB.nombre || ''; } catch (e) { }
 const db = firebase.database();
 const auth = firebase.auth();
 
 // Webhook de Make SOLO para auto-pedidos de inventario.
 // (Los resultados del equipo ahora los escribe el motor directo en Firebase.)
-const WEBHOOK_AUTOPEDIDO = "https://hook.us2.make.com/h5w14y7wlwdwh3ey492wa7kt7lbltt63";
+const WEBHOOK_AUTOPEDIDO = window.AES_LAB.webhook_make || "";
 
 // =====================================================================
 //  UTILIDADES
@@ -1063,7 +1057,10 @@ function aleatorio(n, alfabeto) { const a = new Uint32Array(n); crypto.getRandom
 
 function urlPortal(token) {
     const base = location.href.split("#")[0].split("?")[0].replace(/[^/]*$/, "");
-    return base + "portal.html" + (token ? "?t=" + token : "");
+    const q = [];
+    if (!window.AES_LAB_ES_PRIMERO) q.push("lab=" + encodeURIComponent(window.AES_LAB_CODIGO));
+    if (token) q.push("t=" + token);
+    return base + "portal.html" + (q.length ? "?" + q.join("&") : "");
 }
 
 // Cada paciente tiene UN enlace (token) y UN código de 6 caracteres para el portal

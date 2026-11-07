@@ -4,12 +4,7 @@
 //  Ve cada ORDEN con el avance de sus exámenes y descarga lo validado.
 //  Los datos están cifrados: se descifran aquí, en su celular/PC.
 // =====================================================================
-firebase.initializeApp({
-    apiKey: "AIzaSyBLuIk-gKICLWlLSdWNAsnVYPXxqvroijI",
-    authDomain: "lis-aes.firebaseapp.com",
-    databaseURL: "https://lis-aes-default-rtdb.firebaseio.com",
-    projectId: "lis-aes"
-});
+firebase.initializeApp(window.AES_LAB.firebase); // ver js/laboratorios.js
 const db = firebase.database();
 const esc = AESInforme.esc;
 const params = new URLSearchParams(location.search);
@@ -132,7 +127,12 @@ function ver(i) {
     window.scrollTo(0, 0);
 }
 function volver() { mostrarLista(); window.scrollTo(0, 0); }
-function salir() { ordenes = []; location.href = location.pathname + (tokenURL ? "?t=" + tokenURL : ""); }
+function salir() {
+    ordenes = []; const q = [];
+    if (params.get("lab")) q.push("lab=" + encodeURIComponent(params.get("lab")));
+    if (tokenURL) q.push("t=" + tokenURL);
+    location.href = location.pathname + (q.length ? "?" + q.join("&") : "");
+}
 
 function pdf(i, btn) {
     const d = informeDe(i);
