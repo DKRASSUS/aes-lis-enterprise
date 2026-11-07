@@ -2290,3 +2290,41 @@ window.guardarObservacion = async function () {
     await db.ref("resultados/" + key + "/observacion").set(t || null);
     mostrarToast("Observación guardada", t ? "Saldrá en el informe." : "Se quitó la observación.");
 };
+
+// ---------- Cuadro para firmar (mouse, dedo o lápiz) ----------
+let padTrazos = 0;
+window.abrirPadFirma = function () {
+    document.getElementById('pad-caja').style.display = "block";
+    const c = document.getElementById('pad-firma');
+    if (!c.dataset.listo) {
+        c.dataset.listo = "1";
+        const ctx = c.getContext("2d"); let dibujando = false, ultimo = null;
+        const pos = e => { const r = c.getBoundingClientRect(); return [(e.clientX - r.left) * c.width / r.width, (e.clientY - r.top) * c.height / r.height]; };
+        c.addEventListener("pointerdown", e => { dibujando = true; ultimo = pos(e); c.setPointerCapture(e.pointerId); padTrazos++; e.preventDefault(); });
+        c.addEventListener("pointermove", e => {
+            if (!dibujando) return; const p = pos(e);
+            ctx.strokeStyle = document.getElementById('pad-color').value; ctx.lineCap = "round"; ctx.lineJoin = "round";
+            ctx.lineWidth = e.pointerType === "pen" && e.pressure ? 1.5 + e.pressure * 3 : 3;
+            ctx.beginPath(); ctx.moveTo(ultimo[0], ultimo[1]); ctx.lineTo(p[0], p[1]); ctx.stroke(); ultimo = p; e.preventDefault();
+        });
+        ["pointerup", "pointercancel", "pointerleave"].forEach(ev => c.addEventListener(ev, () => dibujando = false));
+    }
+    limpiarPad();
+    c.scrollIntoView({ block: "center", behavior: "smooth" });
+};
+window.limpiarPad = function () { const c = document.getElementById('pad-firma'); c.getContext("2d").clearRect(0, 0, c.width, c.height); padTrazos = 0; };
+window.usarPad = function () {
+    if (!padTrazos) return alert("Primero firme dentro del cuadro");
+    const c = document.getElementById('pad-firma'), ctx = c.getContext("2d");
+    // Recorta el espacio en blanco alrededor de la firma
+    const d = ctx.getImageData(0, 0, c.width, c.height).data; let x0 = c.width, y0 = c.height, x1 = 0, y1 = 0;
+    for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3] > 10) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    if (x1 <= x0) return alert("No se detectó la firma");
+    const m = 8, w = x1 - x0 + m * 2, h = y1 - y0 + m * 2;
+    const out = document.createElement("canvas"); out.width = w; out.height = h;
+    out.getContext("2d").drawImage(c, x0 - m, y0 - m, w, h, 0, 0, w, h);   // fondo transparente: se ve bien sobre el informe
+    const url = out.toDataURL("image/png");
+    imagenesPendientes.firma = url; mostrarPrev("firma", url);
+    document.getElementById('pad-caja').style.display = "none";
+    mostrarToast("Firma lista", "Presione 'Guardar' para que quede en sus informes.");
+};
