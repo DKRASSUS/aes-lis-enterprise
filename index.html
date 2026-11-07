@@ -181,8 +181,9 @@
                 <div class="caja-grid">
                     <div class="panel"><h3 class="panel-title">Movimientos</h3><div class="hist-tabla-caja"><table class="results-table hist-tabla"><thead><tr><th>Hora</th><th>Tubo</th><th>Paciente</th><th>Forma</th><th style="text-align:right">Monto</th><th>Usuario</th><th></th></tr></thead><tbody id="caja-movs"></tbody></table></div></div>
                     <div class="panel"><h3 class="panel-title">Cierre de caja</h3>
-                        <p style="font-size:0.85rem; color:#666; margin-top:0;">Cuente el efectivo del cajón y escríbalo. El sistema calcula la diferencia.</p>
-                        <label class="lbl-peq">Efectivo contado (Bs)</label><input type="number" id="cierre-efectivo" step="0.5" class="inp-caja" oninput="previewCierre()">
+                        <p style="font-size:0.85rem; color:#666; margin-top:0;">Los montos ya vienen calculados con lo cobrado del día. Si al contar el cajón hay otra cantidad, corrija el efectivo y el sistema muestra la diferencia.</p>
+                        <div id="cierre-resumen" class="cierre-resumen"></div>
+                        <label class="lbl-peq">Efectivo en el cajón (Bs) — corríjalo solo si al contar no coincide</label><input type="number" id="cierre-efectivo" step="0.5" class="inp-caja" oninput="this.dataset.tocado='1'; previewCierre()">
                         <div id="cierre-diferencia" class="cierre-dif"></div>
                         <label class="lbl-peq">Observación</label><input type="text" id="cierre-obs" class="inp-caja" placeholder="Opcional">
                         <button class="action-btn btn-validate-pdf" style="width:100%; margin-top:10px;" onclick="cerrarCaja()">🔒 Registrar cierre de caja</button>
