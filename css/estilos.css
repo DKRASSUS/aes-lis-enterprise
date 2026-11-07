@@ -268,3 +268,6 @@ body.rol-consulta #panel-entrega, body.rol-consulta .btn-reprint { display: none
 .motor-card { border: 1px solid #E2E8F0; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
 .motor-card.on { border-left: 6px solid #22C55E; } .motor-card.off { border-left: 6px solid #EF4444; background: #FEF2F2; }
 .motor-card .fila { display: flex; justify-content: space-between; font-size: 0.86rem; padding: 2px 0; border-bottom: 1px dashed #F1F5F9; }
+.cierre-resumen { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 6px 10px; }
+.fila-cierre { display: flex; justify-content: space-between; font-size: 0.85rem; padding: 3px 0; border-bottom: 1px dashed #E2E8F0; }
+.fila-cierre.total { border: none; font-size: 0.95rem; color: #166534; padding-top: 6px; }
