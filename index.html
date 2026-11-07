@@ -277,6 +277,7 @@
                 <div class="panel panel-blue solo-admin" style="margin-top: 20px;">
                     <h3 class="panel-title">👥 Usuarios y Roles</h3>
                     <p style="font-size:0.85rem; color:#666; margin-top:0;"><b>Administrador:</b> todo. <b>Bioquímico:</b> valida, admisión, historial, estadísticas, inventario. <b>Recepción:</b> admisión, historial y reenviar resultados (no valida). <b>Solo consulta:</b> ve resultados e historial, no cambia nada.</p>
+                    <button id="btn-propietario" class="action-btn" style="display:none; background:#FEF3C7; border:1px solid #F59E0B; color:#92400E; font-weight:bold; margin-bottom:8px;" onclick="reclamarPropietario()">👑 Marcar mi cuenta como Propietario (una sola vez)</button>
                     <h4 style="margin-bottom:6px;">Crear usuario nuevo</h4>
                     <div class="form-usuario">
                         <input type="text" id="nu-nombre" placeholder="Nombre (Ej: Dra. Pérez)">
@@ -310,8 +311,16 @@
                         <input type="checkbox" id="conf-auto-correo" style="width: 20px; height: 20px;">
                         <label for="conf-auto-correo" style="margin: 0; text-transform: none; font-size: 0.9rem;">Enviar el correo al paciente <b>automáticamente al validar</b> (si tiene correo cargado)</label>
                     </div>
+                    <div class="form-group" style="background: #F8FAFC; padding: 12px; border-radius: 6px;">
+                        <label for="conf-metodo-correo" style="text-transform:none; font-size:0.9rem;">¿Quién envía los correos (resultados y auto-pedidos)?</label>
+                        <select id="conf-metodo-correo" style="width:100%; padding:8px; margin-top:6px;">
+                            <option value="motor">El motor de la PC del laboratorio, con Gmail (recomendado, gratis)</option>
+                            <option value="make">Make.com (como antes)</option>
+                        </select>
+                    </div>
                     <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                         <button class="btn-success-adm" style="margin-top: 0; padding: 10px; width: auto; flex: 1;" onclick="guardarConfigEntrega()">Guardar</button>
+                        <button class="btn-success-adm" style="margin-top: 0; padding: 10px; width: auto; flex: 1; background: #16A34A;" onclick="correoPruebaMotor()">🧪 Probar correo del motor</button>
                         <button class="btn-success-adm" style="margin-top: 0; padding: 10px; width: auto; flex: 1; background: var(--aes-purple);" onclick="enviarPruebaMake()">🧪 Enviar datos de prueba a Make</button>
                     </div>
                 </div>
