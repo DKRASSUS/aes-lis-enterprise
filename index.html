@@ -24,6 +24,15 @@
         </div>
     </div>
     
+    <div id="sin-rol-screen" style="position: fixed; inset: 0; background: var(--aes-dark); display: none; justify-content: center; align-items: center; z-index: 9998;">
+        <div style="background: white; padding: 35px; border-radius: 12px; text-align: center; width: 400px;">
+            <h2 style="margin-top:0; color: var(--aes-dark);">🔒 Acceso pendiente</h2>
+            <p style="font-weight:bold;" id="sin-rol-email"></p>
+            <p style="color:#555; font-size:0.9rem;" id="sin-rol-msg"></p>
+            <button onclick="cerrarSesion()" style="background: var(--aes-blue); color: white; border: none; padding: 12px 25px; border-radius: 6px; font-weight: bold; cursor: pointer;">Volver al inicio</button>
+        </div>
+    </div>
+
     <div class="topbar">
         <h2>AES <span>O.S. Enterprise</span></h2>
         <div class="clock-status">
@@ -34,6 +43,7 @@
                     <div class="notif-body" id="notif-lista"><div style="padding: 20px; text-align: center; color: #888; font-size: 0.85rem;">No hay notificaciones</div></div>
                 </div>
             </div>
+            <span id="usuario-rol" style="color:#CBD5E1; font-size:0.82rem; margin-right:14px;"></span>
             <span id="reloj" style="font-weight: 600; color: #C2E778; font-size: 0.9rem;"></span>
             <div style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; background: rgba(255,255,255,0.1); padding: 5px 12px; border-radius: 20px;">
                 <span style="display: inline-block; width: 8px; height: 8px; background: var(--success); border-radius: 50%;"></span> Sistema Online
@@ -146,7 +156,7 @@
                         <div class="hist-ancho"><label>Paciente (nombre o CI)</label><input type="text" id="hist-paciente" placeholder="Ej: Mariela o 6144748" onkeydown="if(event.key==='Enter')buscarHistorialTabla()"></div>
                         <div><label>N° de tubo</label><input type="text" id="hist-tubo" placeholder="Ej: 2611064650" onkeydown="if(event.key==='Enter')buscarHistorialTabla()"></div>
                         <div><label>Estado</label><select id="hist-estado" onchange="pintarHistorialTabla()"><option value="">Todos</option><option>Sin resultados</option><option>Pendiente</option><option>Parcial</option><option>Validado</option><option>Rechazado</option></select></div>
-                        <div class="hist-botones"><button class="action-btn btn-validate-pdf" onclick="buscarHistorialTabla()">🔍 Buscar</button><button class="action-btn" onclick="semanaHistorial()">Esta semana</button><button class="action-btn" onclick="exportarHistorialCSV()">⬇ Excel (CSV)</button></div>
+                        <div class="hist-botones"><button class="action-btn btn-validate-pdf" onclick="buscarHistorialTabla()">🔍 Buscar</button><button class="action-btn" onclick="semanaHistorial()">Esta semana</button><button class="action-btn" onclick="exportarHistorialCSV()">⬇ Descargar Excel</button></div>
                     </div>
                     <div id="hist-resumen" class="hist-resumen"></div>
                     <div class="hist-tabla-caja"><table class="results-table hist-tabla"><thead><tr><th>Fecha</th><th>Tubo</th><th>Paciente</th><th>CI</th><th>Pruebas</th><th>Estado</th><th></th></tr></thead><tbody id="hist-cuerpo"></tbody></table></div>
@@ -260,6 +270,27 @@
                         <button class="btn-success-adm" style="margin-top:0; padding: 10px;" onclick="guardarPrueba()">Actualizar Precio</button>
                         <table class="history-table" style="margin-top: 20px;"><thead><tr><th>Prueba (ID)</th><th>Precio Base</th><th>Acción</th></tr></thead><tbody id="tabla-conf-pruebas"></tbody></table>
                     </div>
+                </div>
+
+                <!-- USUARIOS (solo administrador) -->
+                <div class="panel panel-blue solo-admin" style="margin-top: 20px;">
+                    <h3 class="panel-title">👥 Usuarios y Roles</h3>
+                    <p style="font-size:0.85rem; color:#666; margin-top:0;"><b>Administrador:</b> todo. <b>Bioquímico:</b> valida, admisión, historial, estadísticas, inventario. <b>Recepción:</b> admisión, historial y reenviar resultados (no valida). <b>Solo consulta:</b> ve resultados e historial, no cambia nada.</p>
+                    <h4 style="margin-bottom:6px;">Crear usuario nuevo</h4>
+                    <div class="form-usuario">
+                        <input type="text" id="nu-nombre" placeholder="Nombre (Ej: Dra. Pérez)">
+                        <input type="email" id="nu-email" placeholder="Correo">
+                        <div style="display:flex; gap:4px;"><input type="password" id="nu-clave" placeholder="Contraseña temporal" style="flex:1;"><button type="button" onclick="generarClaveTemporal()" title="Generar una al azar">🎲</button></div>
+                        <select id="nu-rol"></select>
+                        <button class="action-btn btn-validate-pdf" onclick="crearUsuario()">➕ Crear</button>
+                    </div>
+                    <p id="nu-msg" style="font-size:0.85rem; color: var(--aes-blue);"></p>
+                    <div id="caja-solicitudes" style="display:none; background:#FEF9C3; border:1px solid #FDE047; border-radius:8px; padding:10px; margin:10px 0;">
+                        <h4 style="margin:0 0 6px;">⏳ Solicitudes pendientes (entraron al LIS y esperan un rol)</h4>
+                        <table class="results-table"><thead><tr><th>Correo</th><th>Fecha</th><th>Rol</th><th></th></tr></thead><tbody id="tabla-solicitudes"></tbody></table>
+                    </div>
+                    <table class="results-table" style="margin-top:10px;"><thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="tabla-usuarios"></tbody></table>
+                    <p style="font-size:0.78rem; color:#94A3B8;">El usuario del motor (PC del equipo) no aparece aquí y no se toca: sigue funcionando igual.</p>
                 </div>
 
                 <!-- RENDIMIENTO -->
