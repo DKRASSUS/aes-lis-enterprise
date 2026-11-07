@@ -16,7 +16,7 @@
     <div id="login-screen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--aes-dark); display: flex; justify-content: center; align-items: center; z-index: 9999;">
         <div style="background: white; padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: center; width: 350px;">
             <h1 style="margin-top: 0; color: var(--aes-dark);">AES <span style="color: var(--aes-blue);">O.S.</span></h1>
-            <p style="color: #666; font-size: 0.9rem; margin-bottom: 30px;">Acceso restringido</p>
+            <p id="login-lab" style="color: var(--aes-blue); font-weight:bold; margin:0 0 4px;"></p><p style="color: #666; font-size: 0.9rem; margin-bottom: 30px;">Acceso restringido</p>
             <div style="text-align: left; margin-bottom: 15px;"><label style="font-size: 0.8rem; font-weight: bold; color: #555;">Correo</label><input type="email" id="login-email" style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; margin-top: 5px;"></div>
             <div style="text-align: left; margin-bottom: 25px;"><label style="font-size: 0.8rem; font-weight: bold; color: #555;">Contraseña</label><input type="password" id="login-pass" style="width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; margin-top: 5px;"></div>
             <button onclick="iniciarSesion()" style="width: 100%; background: var(--aes-blue); color: white; border: none; padding: 15px; border-radius: 6px; font-weight: bold; font-size: 1rem; cursor: pointer;">Ingresar</button>
@@ -380,6 +380,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <script src="js/laboratorios.js"></script>
     <script src="js/informe.js"></script>
     <script src="js/app.js"></script>
 </body>
