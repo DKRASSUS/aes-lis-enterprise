@@ -308,3 +308,16 @@ body.rol-consulta #panel-entrega, body.rol-consulta .btn-reprint { display: none
 #pad-firma { width: 100%; height: auto; background: #fff; border: 1px solid #CBD5E1; border-radius: 6px; touch-action: none; cursor: crosshair; display: block; margin-top: 6px; }
 .pad-linea { border-top: 1px solid #94A3B8; margin: -34px 40px 18px; text-align: center; font-size: .7rem; color: #94A3B8; padding-top: 2px; pointer-events: none; position: relative; }
 .btn-dibujar { background: #DBEAFE !important; font-size: .85rem !important; }
+
+/* ---- Plataforma, instalación y facturación (v6.2) ---- */
+.solo-propietario { display: none; }
+body.es-propietario.lab-maestro .solo-propietario { display: block; }
+.eq-fila { display: grid; grid-template-columns: 1.4fr .9fr .8fr .7fr .6fr .6fr auto; gap: 6px; align-items: end; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 8px; margin-bottom: 6px; }
+.eq-fila label { display: block; font-size: .68rem; font-weight: bold; color: #475569; }
+.eq-fila input, .eq-fila select { width: 100%; padding: 6px; border: 1px solid #CBD5E1; border-radius: 5px; box-sizing: border-box; }
+.factura-admision { margin-top: 8px; background: #F5F3FF; border: 1px solid #DDD6FE; padding: 10px; border-radius: 8px; }
+.chk-fact { display: flex; align-items: center; gap: 8px; font-weight: bold; color: #5B21B6; font-size: .9rem; cursor: pointer; }
+.chk-fact input { width: 18px; height: 18px; }
+#fac-datos { display: grid; grid-template-columns: 1.2fr .5fr; gap: 8px; margin-top: 8px; }
+#fac-datos label { display: block; font-size: .72rem; font-weight: bold; color: #5B21B6; }
+#fac-datos input { width: 100%; padding: 7px; border: 1px solid #CBD5E1; border-radius: 6px; box-sizing: border-box; }
