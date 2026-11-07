@@ -58,9 +58,11 @@
             <div class="nav-item active" onclick="switchView('admision', this)">🏥 Admisión y Órdenes</div>
             <div class="nav-item" onclick="switchView('validacion', this)">🔬 Validación Médica</div>
             <div class="nav-item" onclick="switchView('historial', this)">📋 Historial</div>
+            <div class="nav-item" onclick="switchView('caja', this)">💰 Caja</div>
             <div class="nav-item" onclick="switchView('estadisticas', this)">📊 Estadísticas</div>
             <div class="nav-item" onclick="switchView('inventario', this)">📦 Inventario</div>
-            <div class="nav-item" onclick="switchView('configuracion', this)" style="margin-top: 20px; border-top: 1px solid var(--border-color);">⚙️ Configuración</div>
+            <div class="nav-item" onclick="switchView('monitoreo', this)" style="margin-top: 20px; border-top: 1px solid var(--border-color);">📡 Monitoreo</div>
+            <div class="nav-item" onclick="switchView('configuracion', this)">⚙️ Configuración</div>
         </nav>
 
         <main class="main-content">
@@ -93,6 +95,11 @@
                             <div id="panel-cotizacion" style="display: none;">
                                 <table class="quote-table"><thead><tr><th>Prueba</th><th>Precio (Bs)</th><th>Editar</th></tr></thead><tbody id="lista-precios"></tbody></table>
                                 <div class="quote-summary"><div class="summary-row"><span>Subtotal:</span><span id="lbl-subtotal">0.00 Bs</span></div><div class="summary-row" style="color: var(--danger);"><span>Descuento Seguro:</span><span id="lbl-descuento">- 0.00 Bs</span></div><div class="summary-total"><span>TOTAL:</span><span id="lbl-total" style="color: var(--success);">0.00 Bs</span></div></div>
+                                <div class="pago-admision">
+                                    <div><label>Paga ahora (Bs)</label><input type="number" id="pago-monto" min="0" step="0.5" oninput="actualizarSaldoAdmision()"></div>
+                                    <div><label>Forma de pago</label><select id="pago-metodo"><option>Efectivo</option><option>QR</option><option>Tarjeta</option><option>Transferencia</option><option>Seguro / Crédito</option></select></div>
+                                    <div><label>Saldo</label><div id="pago-saldo" class="pago-saldo">0.00 Bs</div></div>
+                                </div>
                             </div>
                             <button class="btn-success-adm" onclick="generarOrden()">💳 Generar Orden LIS</button>
                         </div>
@@ -162,6 +169,34 @@
                     <div id="hist-resumen" class="hist-resumen"></div>
                     <div class="hist-tabla-caja"><table class="results-table hist-tabla"><thead><tr><th>Fecha</th><th>Tubo</th><th>Paciente</th><th>CI</th><th>Pruebas</th><th>Estado</th><th></th></tr></thead><tbody id="hist-cuerpo"></tbody></table></div>
                 </div>
+            </div>
+
+            <!-- VISTA: CAJA -->
+            <div id="view-caja" class="view-section">
+                <div class="panel panel-blue">
+                    <h3 class="panel-title">💰 Caja del día</h3>
+                    <div class="caja-barra"><label>Día</label><input type="date" id="caja-dia" onchange="cargarCaja()"><button class="action-btn" onclick="document.getElementById('caja-dia').value=fechaLocalISO(); cargarCaja()">Hoy</button><button class="action-btn" onclick="exportarCajaExcel()">⬇ Excel del día</button></div>
+                    <div id="caja-tarjetas" class="caja-tarjetas"></div>
+                </div>
+                <div class="caja-grid">
+                    <div class="panel"><h3 class="panel-title">Movimientos</h3><div class="hist-tabla-caja"><table class="results-table hist-tabla"><thead><tr><th>Hora</th><th>Tubo</th><th>Paciente</th><th>Forma</th><th style="text-align:right">Monto</th><th>Usuario</th><th></th></tr></thead><tbody id="caja-movs"></tbody></table></div></div>
+                    <div class="panel"><h3 class="panel-title">Cierre de caja</h3>
+                        <p style="font-size:0.85rem; color:#666; margin-top:0;">Cuente el efectivo del cajón y escríbalo. El sistema calcula la diferencia.</p>
+                        <label class="lbl-peq">Efectivo contado (Bs)</label><input type="number" id="cierre-efectivo" step="0.5" class="inp-caja" oninput="previewCierre()">
+                        <div id="cierre-diferencia" class="cierre-dif"></div>
+                        <label class="lbl-peq">Observación</label><input type="text" id="cierre-obs" class="inp-caja" placeholder="Opcional">
+                        <button class="action-btn btn-validate-pdf" style="width:100%; margin-top:10px;" onclick="cerrarCaja()">🔒 Registrar cierre de caja</button>
+                        <div id="cierre-lista" style="margin-top:12px; font-size:0.85rem;"></div>
+                    </div>
+                </div>
+                <div class="panel"><h3 class="panel-title">Cuentas por cobrar (últimos 60 días)</h3><div class="hist-tabla-caja"><table class="results-table hist-tabla"><thead><tr><th>Fecha</th><th>Tubo</th><th>Paciente</th><th>CI</th><th style="text-align:right">Total</th><th style="text-align:right">Pagado</th><th style="text-align:right">Saldo</th><th>Cobrar</th></tr></thead><tbody id="caja-deudas"></tbody></table></div></div>
+            </div>
+
+            <!-- VISTA: MONITOREO -->
+            <div id="view-monitoreo" class="view-section">
+                <div class="panel panel-blue"><h3 class="panel-title">📡 Monitoreo del sistema</h3><div id="mon-tarjetas" class="caja-tarjetas"></div></div>
+                <div class="panel"><h3 class="panel-title">🖥️ Motores (PCs de los equipos)</h3><div id="mon-motores"></div></div>
+                <div class="panel"><h3 class="panel-title">✉️ Correos con error</h3><div id="mon-correos"></div></div>
             </div>
 
             <!-- VISTA 3: ESTADÍSTICAS -->
