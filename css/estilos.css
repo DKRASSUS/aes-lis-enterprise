@@ -304,3 +304,7 @@ body.rol-consulta #panel-entrega, body.rol-consulta .btn-reprint { display: none
 .obs-box textarea { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #CBD5E1; border-radius: 6px; font-family: inherit; }
 .btn-com { background: none; border: none; cursor: pointer; font-size: 0.95rem; opacity: .55; padding: 0 4px; } .btn-com:hover, .btn-com.tiene { opacity: 1; }
 .com-fila td { font-size: 0.8rem; color: #475569; font-style: italic; padding-top: 0 !important; }
+.pad-caja { border: 2px dashed #93C5FD; background: #F8FAFC; border-radius: 10px; padding: 10px; margin-bottom: 12px; }
+#pad-firma { width: 100%; height: auto; background: #fff; border: 1px solid #CBD5E1; border-radius: 6px; touch-action: none; cursor: crosshair; display: block; margin-top: 6px; }
+.pad-linea { border-top: 1px solid #94A3B8; margin: -34px 40px 18px; text-align: center; font-size: .7rem; color: #94A3B8; padding-top: 2px; pointer-events: none; position: relative; }
+.btn-dibujar { background: #DBEAFE !important; font-size: .85rem !important; }
