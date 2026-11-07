@@ -34,6 +34,20 @@
         </div>
     </div>
 
+    <div id="modal-firma" class="modal-firma" style="display:none;">
+        <div class="modal-firma-caja">
+            <h3 style="margin-top:0;">✍️ Mi firma para los informes</h3>
+            <p style="font-size:0.85rem; color:#666; margin-top:0;">Sale al pie de cada informe que usted valide. Suba una foto de su firma y su sello sobre papel blanco (el sistema la achica sola).</p>
+            <div class="form-group"><label>Nombre como debe salir</label><input type="text" id="mf-nombre" placeholder="Ej: Dra. María Pérez Rojas"></div>
+            <div class="form-row"><div class="form-group"><label>Título / cargo</label><input type="text" id="mf-titulo" placeholder="Ej: Bioquímica Farmacéutica"></div><div class="form-group"><label>Matrícula profesional</label><input type="text" id="mf-matricula" placeholder="Ej: M.P. B-1234"></div></div>
+            <div class="form-row">
+                <div class="form-group"><label>Firma</label><div class="logo-box"><img id="mf-firma-prev" alt="" style="display:none;"><div><input type="file" accept="image/*" onchange="cargarImagen(this, 'firma')"><br><button type="button" class="btn-mini" onclick="quitarImagen('firma')">Quitar</button></div></div></div>
+                <div class="form-group"><label>Sello (opcional)</label><div class="logo-box"><img id="mf-sello-prev" alt="" style="display:none;"><div><input type="file" accept="image/*" onchange="cargarImagen(this, 'sello')"><br><button type="button" class="btn-mini" onclick="quitarImagen('sello')">Quitar</button></div></div></div>
+            </div>
+            <div style="display:flex; gap:10px; justify-content:flex-end;"><button class="action-btn" onclick="document.getElementById('modal-firma').style.display='none'">Cancelar</button><button class="action-btn btn-validate-pdf" onclick="guardarMiFirma()">Guardar</button></div>
+        </div>
+    </div>
+
     <div class="topbar">
         <h2>AES <span>O.S. Enterprise</span></h2>
         <div class="clock-status">
@@ -44,7 +58,7 @@
                     <div class="notif-body" id="notif-lista"><div style="padding: 20px; text-align: center; color: #888; font-size: 0.85rem;">No hay notificaciones</div></div>
                 </div>
             </div>
-            <span id="usuario-rol" style="color:#CBD5E1; font-size:0.82rem; margin-right:14px;"></span>
+            <span id="usuario-rol" style="color:#CBD5E1; font-size:0.82rem; margin-right:6px;"></span><button id="btn-mi-firma" onclick="abrirMiFirma()" title="Mi firma y sello para los informes" style="margin-right:14px; background:transparent; border:1px solid #475569; color:#CBD5E1; border-radius:4px; padding:3px 8px; cursor:pointer; font-size:0.78rem;">✍️ Mi firma</button>
             <span id="reloj" style="font-weight: 600; color: #C2E778; font-size: 0.9rem;"></span>
             <div style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; background: rgba(255,255,255,0.1); padding: 5px 12px; border-radius: 20px;">
                 <span style="display: inline-block; width: 8px; height: 8px; background: var(--success); border-radius: 50%;"></span> Sistema Online
@@ -58,6 +72,7 @@
             <div class="nav-item active" onclick="switchView('admision', this)">🏥 Admisión y Órdenes</div>
             <div class="nav-item" onclick="switchView('validacion', this)">🔬 Validación Médica</div>
             <div class="nav-item" onclick="switchView('historial', this)">📋 Historial</div>
+            <div class="nav-item" onclick="switchView('control', this)">🎯 Control de Calidad</div>
             <div class="nav-item" onclick="switchView('caja', this)">💰 Caja</div>
             <div class="nav-item" onclick="switchView('estadisticas', this)">📊 Estadísticas</div>
             <div class="nav-item" onclick="switchView('inventario', this)">📦 Inventario</div>
@@ -131,6 +146,7 @@
                             <div class="panel" style="padding-top: 10px;">
                                 <h3 class="panel-title">Resultados <span id="badge-estado-visor" style="background: #E0F2FE; color: var(--aes-blue); padding: 4px 12px; border-radius: 20px; font-size: 0.75rem;">Pendiente</span></h3>
                                 <table class="results-table"><thead><tr><th>Análisis Clínico</th><th>Valor</th><th>Unidad</th><th>Referencia</th></tr></thead><tbody id="tabla-analitos"></tbody></table>
+                                <div class="obs-box"><label for="obs-general">📝 Observación del informe (sale en el PDF)</label><textarea id="obs-general" rows="2" placeholder="Ej: Muestra levemente hemolizada. Se sugiere control en 3 meses." onchange="guardarObservacion()"></textarea></div>
                                 <div class="action-panel" id="botones-pendientes"><button class="action-btn btn-reject" onclick="rechazarMuestra()">✖ Rechazar</button><button class="action-btn btn-val-sel" onclick="validarSeleccionados()">☑ Validar seleccionados</button><button class="action-btn btn-validate-pdf" onclick="validarYGenerarPDF()">✔ Validar todo e Imprimir</button></div>
                                 <div class="action-panel" id="botones-validados" style="display: none;"><button class="action-btn btn-revert" onclick="revertirValidacion()">↩ Revertir</button><button class="action-btn btn-reprint" onclick="descargarSoloPDF(false)">🖨️ Re-imprimir</button></div>
                                 <div class="action-panel" id="botones-rechazados" style="display: none;"><button class="action-btn btn-revert" onclick="restaurarRechazado()">↩ Devolver a Pendientes</button></div>
@@ -168,6 +184,30 @@
                     </div>
                     <div id="hist-resumen" class="hist-resumen"></div>
                     <div class="hist-tabla-caja"><table class="results-table hist-tabla"><thead><tr><th>Fecha</th><th>Tubo</th><th>Paciente</th><th>CI</th><th>Pruebas</th><th>Estado</th><th></th></tr></thead><tbody id="hist-cuerpo"></tbody></table></div>
+                </div>
+            </div>
+
+            <!-- VISTA: CONTROL DE CALIDAD -->
+            <div id="view-control" class="view-section">
+                <div class="qc-grid">
+                    <div class="panel">
+                        <h3 class="panel-title">🎯 Controles</h3>
+                        <div id="qc-lista"></div>
+                        <details id="qc-nuevo-box" style="margin-top:12px;"><summary style="cursor:pointer; font-weight:bold; color: var(--aes-blue);">➕ Agregar control (prueba + nivel + lote)</summary>
+                            <div class="qc-form">
+                                <div><label>Prueba (código del LIS)</label><input id="qcn-prueba" placeholder="GLU"></div>
+                                <div><label>Nivel</label><select id="qcn-nivel"><option>Nivel 1 (Normal)</option><option>Nivel 2 (Patológico)</option><option>Nivel 3</option></select></div>
+                                <div><label>Lote</label><input id="qcn-lote" placeholder="Ej: 45210"></div>
+                                <div><label>Vence</label><input type="date" id="qcn-vence"></div>
+                                <div><label>Media (del inserto)</label><input type="number" step="any" id="qcn-media"></div>
+                                <div><label>DE (desvío estándar)</label><input type="number" step="any" id="qcn-de"></div>
+                                <div><label>Unidad</label><input id="qcn-unidad" placeholder="mg/dL"></div>
+                                <div><label>Equipo</label><input id="qcn-equipo" placeholder="Ej: ATELLICA CI"></div>
+                            </div>
+                            <button class="action-btn btn-validate-pdf" style="margin-top:8px;" onclick="guardarMaterialQC()">Guardar control</button>
+                        </details>
+                    </div>
+                    <div class="panel" id="qc-detalle"><div class="empty-state" style="min-height:300px;"><h3>Elija un control</h3><p>A la izquierda, o agregue uno nuevo.</p></div></div>
                 </div>
             </div>
 
@@ -291,6 +331,11 @@
                         <div class="form-group"><label>Teléfono de Contacto (Compras)</label><input type="text" id="conf-lab-telefono" placeholder="Ej: +591 77712345"></div>
                     </div>
                     <div class="form-group"><label>Dirección de Entrega</label><input type="text" id="conf-lab-direccion" placeholder="Ej: Av. Principal #123, Santa Cruz"></div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Logo del laboratorio (sale en el informe y en el portal)</label>
+                            <div class="logo-box"><img id="conf-lab-logo-prev" alt="" style="display:none;"><div><input type="file" id="conf-lab-logo" accept="image/*" onchange="cargarImagen(this, 'logo')"><br><button type="button" class="btn-mini" onclick="quitarImagen('logo')">Quitar logo</button></div></div></div>
+                        <div class="form-group"><label>Texto al pie del informe (opcional)</label><input type="text" id="conf-lab-pie" placeholder="Ej: Resolución SEDES N° 123/2025 · Horario 7:00 a 19:00"></div>
+                    </div>
                     <button class="btn-success-adm" style="background-color: var(--aes-purple); margin-top:0; padding: 10px;" onclick="guardarPerfilLab()">Guardar Perfil de Laboratorio</button>
                 </div>
 
