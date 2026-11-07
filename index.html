@@ -41,8 +41,19 @@
             <div class="form-group"><label>Nombre como debe salir</label><input type="text" id="mf-nombre" placeholder="Ej: Dra. María Pérez Rojas"></div>
             <div class="form-row"><div class="form-group"><label>Título / cargo</label><input type="text" id="mf-titulo" placeholder="Ej: Bioquímica Farmacéutica"></div><div class="form-group"><label>Matrícula profesional</label><input type="text" id="mf-matricula" placeholder="Ej: M.P. B-1234"></div></div>
             <div class="form-row">
-                <div class="form-group"><label>Firma</label><div class="logo-box"><img id="mf-firma-prev" alt="" style="display:none;"><div><input type="file" accept="image/*" onchange="cargarImagen(this, 'firma')"><br><button type="button" class="btn-mini" onclick="quitarImagen('firma')">Quitar</button></div></div></div>
+                <div class="form-group"><label>Firma</label><div class="logo-box"><img id="mf-firma-prev" alt="" style="display:none;"><div><button type="button" class="btn-mini btn-dibujar" onclick="abrirPadFirma()">✍️ Firmar aquí</button> <small>o</small> <label class="btn-mini" style="display:inline-block; cursor:pointer;">📷 Subir foto<input type="file" accept="image/*" style="display:none;" onchange="cargarImagen(this, 'firma')"></label><br><button type="button" class="btn-mini" onclick="quitarImagen('firma')">Quitar</button></div></div></div>
                 <div class="form-group"><label>Sello (opcional)</label><div class="logo-box"><img id="mf-sello-prev" alt="" style="display:none;"><div><input type="file" accept="image/*" onchange="cargarImagen(this, 'sello')"><br><button type="button" class="btn-mini" onclick="quitarImagen('sello')">Quitar</button></div></div></div>
+            </div>
+            <div id="pad-caja" class="pad-caja" style="display:none;">
+                <div style="display:flex; justify-content:space-between; align-items:center;"><b>Firme dentro del cuadro</b><small>con el mouse, el dedo o un lápiz</small></div>
+                <canvas id="pad-firma" width="560" height="200"></canvas>
+                <div class="pad-linea">Firma</div>
+                <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:6px;">
+                    <label style="margin-right:auto; font-size:.8rem;">Color <select id="pad-color"><option value="#0b2a6f">Azul</option><option value="#111111">Negro</option></select></label>
+                    <button type="button" class="btn-mini" onclick="limpiarPad()">🧹 Borrar</button>
+                    <button type="button" class="btn-mini" onclick="document.getElementById('pad-caja').style.display='none'">Cerrar</button>
+                    <button type="button" class="action-btn btn-validate-pdf" style="padding:6px 14px;" onclick="usarPad()">✔ Usar esta firma</button>
+                </div>
             </div>
             <div style="display:flex; gap:10px; justify-content:flex-end;"><button class="action-btn" onclick="document.getElementById('modal-firma').style.display='none'">Cancelar</button><button class="action-btn btn-validate-pdf" onclick="guardarMiFirma()">Guardar</button></div>
         </div>
